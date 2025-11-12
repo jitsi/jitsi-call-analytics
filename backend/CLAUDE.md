@@ -459,13 +459,6 @@ Participants who rejoin get new endpointId but same displayName. DumpProcessor m
 - `endpointIds[]` array with all historical IDs
 - `sessionMap` for accessing per-session data
 
-### RTCStats CLI Dependency
-Backend shells out to rtcstats-cli for production data access. Requires:
-- Bash script at `RTCSTATS_CLI_PATH`
-- AWS CLI configured with S3 access
-- PostgreSQL client (psql) for Redshift queries
-- Proper credentials for target environment
-
 ### Performance Considerations
 - Large conference dumps (100+ participants) may take 30+ seconds to process
 - Consider implementing caching for frequently accessed conferences

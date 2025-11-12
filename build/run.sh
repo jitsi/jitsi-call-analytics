@@ -14,17 +14,8 @@ fi
 echo "Configuration:"
 echo "  NODE_ENV: ${NODE_ENV:-production}"
 echo "  PORT: ${PORT:-5000}"
-echo "  RTCSTATS_CLI_PATH: ${RTCSTATS_CLI_PATH}"
 echo "  RTCSTATS_DOWNLOADS_PATH: ${RTCSTATS_DOWNLOADS_PATH}"
 echo "  RTCSTATS_ENV: ${RTCSTATS_ENV:-prod}"
-
-# Verify rtcstats-cli is available
-if [ -f "${RTCSTATS_CLI_PATH}" ]; then
-    echo "RTCStats CLI found at: ${RTCSTATS_CLI_PATH}"
-else
-    echo "WARNING: RTCStats CLI not found at: ${RTCSTATS_CLI_PATH}"
-    echo "RTCStats integration will not work. Configure RTCSTATS_CLI_PATH correctly."
-fi
 
 # Ensure download directories exist
 mkdir -p "${RTCSTATS_DOWNLOADS_PATH}/prod"
