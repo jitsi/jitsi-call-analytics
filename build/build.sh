@@ -31,7 +31,7 @@ npm run build
 if [ "$PUSH_AWS" = "true" ]; then
     echo "Building and pushing multi-platform image to AWS ECR"
     [ -z "$AWS_REGION" ] && AWS_REGION="us-west-2"
-	aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${REGISTRY}
+	aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${REGISTRY}
 	docker buildx build --no-cache --platform=linux/arm64,linux/amd64 --push --pull --progress=plain \
         --tag ${DOCKER_REPO_HOST}/${IMAGE_NAME}:latest \
         --tag ${DOCKER_REPO_HOST}/${IMAGE_NAME}:${IMAGE_TAG} .
