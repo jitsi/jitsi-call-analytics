@@ -23,33 +23,9 @@ echo "  Push: ${PUSH}"
 cd "$(dirname "$0")/.."
 PROJECT_ROOT=$(pwd)
 
-# Check for rtcstats-cli
-RTCSTATS_CLI_PATH="../rtcstats-cli"
-if [ ! -d "$RTCSTATS_CLI_PATH" ]; then
-    echo "ERROR: rtcstats-cli not found at $RTCSTATS_CLI_PATH"
-    echo "Please clone rtcstats-cli:"
-    echo "  cd $(dirname $PROJECT_ROOT)"
-    echo "  git clone https://github.com/jitsi/rtcstats-cli.git"
-    exit 1
-fi
-
-echo "Found rtcstats-cli at $RTCSTATS_CLI_PATH"
-
 # Build the application locally first
 echo "Building application locally..."
 npm run build
-
-# Copy rtcstats-cli into build context temporarily
-echo "Copying rtcstats-cli into build context..."
-rm -rf .rtcstats-cli-build
-cp -r "$RTCSTATS_CLI_PATH" .rtcstats-cli-build
-
-# Cleanup function
-cleanup() {
-    echo "Cleaning up temporary rtcstats-cli copy..."
-    rm -rf "$PROJECT_ROOT/.rtcstats-cli-build"
-}
-trap cleanup EXIT
 
 # Build Docker image
 if [ "$PUSH_AWS" = "true" ]; then

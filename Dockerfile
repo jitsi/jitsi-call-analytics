@@ -26,9 +26,6 @@ COPY backend/dist ./dist
 # Copy frontend build
 COPY frontend/build ./frontend/build
 
-# Copy rtcstats-cli (copied into build context by build.sh)
-COPY .rtcstats-cli-build /usr/local/rtcstats-cli
-
 # Copy run scripts
 COPY build/run.sh ./
 COPY build/pre-run.sh /usr/jitsi/pre-run.sh
@@ -42,7 +39,6 @@ RUN mkdir -p /data/rtcstats-downloads/prod && \
 
 # Set environment variables
 ENV NODE_ENV=production \
-    RTCSTATS_CLI_PATH=/usr/local/rtcstats-cli/bin/rtcstats.sh \
     RTCSTATS_DOWNLOADS_PATH=/data/rtcstats-downloads \
     FRONTEND_BUILD_PATH=/usr/src/app/frontend/build \
     PORT=5000
