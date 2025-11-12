@@ -31,15 +31,15 @@ npm run build
 if [ "$PUSH_AWS" = "true" ]; then
     echo "Building and pushing multi-platform image to AWS ECR"
     [ -z "$AWS_REGION" ] && AWS_REGION="us-west-2"
-	aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${REGISTRY}
+	aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${DOCKER_REPO_HOST}
 	docker buildx build --no-cache --platform=linux/arm64,linux/amd64 --push --pull --progress=plain \
         --tag ${DOCKER_REPO_HOST}/${IMAGE_NAME}:latest \
         --tag ${DOCKER_REPO_HOST}/${IMAGE_NAME}:${IMAGE_TAG} .
 elif [ "$PUSH" = "true" ]; then
     echo "Building and pushing multi-platform image..."
     docker buildx build --no-cache --platform=linux/arm64,linux/amd64 --push --pull --progress=plain \
-        --tag ${DOCKER_REPO_HOST}${IMAGE_NAME}:latest \
-        --tag ${DOCKER_REPO_HOST}${IMAGE_NAME}:${IMAGE_TAG} .
+        --tag ${DOCKER_REPO_HOST}/${IMAGE_NAME}:latest \
+        --tag ${DOCKER_REPO_HOST}/${IMAGE_NAME}:${IMAGE_TAG} .
 else
     echo "Building local image for current platform..."
     docker build --no-cache --progress=plain \
