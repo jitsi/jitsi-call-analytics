@@ -236,7 +236,7 @@ export class S3DumpService {
             let filesCompleted = 0;
             const bytesDownloaded = 0;
             const missingFiles: string[] = [];
-            const failedFiles: Array<{ file: string; error: string }> = [];
+            const failedFiles: Array<{ error: string; file: string; }> = [];
 
             // Download each dump file by ID
             // Files are stored flat in S3, dumpId already includes .gz extension

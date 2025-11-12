@@ -58,7 +58,7 @@ export class RTCStatsService {
             return false;
         }
         // Backend components
-        const backendComponents = ['JVB', 'Jicofo'];
+        const backendComponents = [ 'JVB', 'Jicofo' ];
 
         return !backendComponents.includes(app);
     }

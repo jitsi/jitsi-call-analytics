@@ -7,7 +7,6 @@ This guide explains how to build and run Jitsi Call Analytics in Docker containe
 - Docker 20.10+ with BuildKit support
 - Docker Compose v2.0+
 - (Optional) Docker Buildx for multi-platform builds
-- (Optional) rtcstats-cli tool for production RTCStats integration
 
 ## Quick Start - Local Testing
 
@@ -28,7 +27,6 @@ TAG=dev ./build/build.sh
 cp .env.docker .env
 
 # Edit .env with your configuration
-# Particularly important if you have rtcstats-cli set up locally
 nano .env
 ```
 
@@ -60,68 +58,6 @@ docker compose down
 # Stop and remove volumes
 docker compose down -v
 ```
-
-## RTCStats CLI Integration
-
-The application requires rtcstats-cli for downloading conference dumps from production RTCStats servers.
-
-### Option 1: Mount Local rtcstats-cli (Development)
-
-If you have rtcstats-cli installed locally:
-
-1. Edit `docker-compose.yml` and uncomment the volume mount:
-
-```yaml
-volumes:
-  # Replace with your actual rtcstats-cli path
-  - /path/to/your/rtcstats-cli:/usr/local/rtcstats-cli:ro
-```
-
-2. Update environment variable if needed:
-
-```yaml
-environment:
-  - RTCSTATS_CLI_PATH=/usr/local/rtcstats-cli/bin/rtcstats.sh
-```
-
-3. Ensure rtcstats-cli has proper credentials configured
-
-### Option 2: Build rtcstats-cli into Image (Production)
-
-Modify the Dockerfile to include actual rtcstats-cli:
-
-```dockerfile
-# Stage 3: Setup rtcstats-cli
-FROM alpine:3.18 AS rtcstats-cli-builder
-
-WORKDIR /rtcstats-cli
-
-RUN apk add --no-cache bash curl git postgresql-client aws-cli jq
-
-# Clone and setup rtcstats-cli (replace with actual repository)
-RUN git clone https://internal-repo/rtcstats-cli.git .
-
-# Configure and build if necessary
-RUN chmod +x bin/rtcstats.sh
-```
-
-### RTCStats CLI Requirements
-
-The rtcstats-cli tool typically requires:
-
-1. **PostgreSQL Access**: Connection to RTCStats database
-2. **AWS Credentials**: S3 access for downloading dumps
-3. **Environment Configuration**: prod/pilot/debug environment selection
-
-Configure these in your `.env` file or docker-compose.yml:
-
-```bash
-# PostgreSQL (for rtcstats-cli database queries)
-RTCSTATS_DB_HOST=your-postgres-host
-RTCSTATS_DB_PORT=5432
-RTCSTATS_DB_USER=rtcstats_reader
-RTCSTATS_DB_PASSWORD=your_password
-RTCSTATS_DB_NAME=rtcstats
 
 # AWS (for S3 dump downloads)
 AWS_ACCESS_KEY_ID=your_access_key
@@ -247,18 +183,10 @@ curl "http://localhost:5000/api/v1/rtcstats/search?q=test&env=prod"
 # Shell into container
 docker compose exec call-analytics sh
 
-# Check rtcstats-cli
-ls -la /usr/local/rtcstats-cli/bin/
-cat /usr/local/rtcstats-cli/bin/rtcstats.sh
-
 # Check file permissions
 ls -la /data/rtcstats-downloads/
 
-# Check environment variables
-env | grep RTCSTATS
 
-# Test rtcstats-cli (if configured)
-/usr/local/rtcstats-cli/bin/rtcstats.sh --help
 ```
 
 ### 5. Monitor Logs
@@ -288,24 +216,6 @@ docker compose logs call-analytics
 # - Volume mount permissions
 ```
 
-### RTCStats CLI not working
-
-```bash
-# Verify rtcstats-cli is mounted/installed
-docker compose exec call-analytics ls -la /usr/local/rtcstats-cli/bin/
-
-# Check rtcstats-cli permissions
-docker compose exec call-analytics cat $RTCSTATS_CLI_PATH
-
-# Test rtcstats-cli directly
-docker compose exec call-analytics /usr/local/rtcstats-cli/bin/rtcstats.sh --help
-
-# Check environment variables
-docker compose exec call-analytics env | grep RTCSTATS
-
-# Check AWS credentials (if using S3)
-docker compose exec call-analytics env | grep AWS
-```
 
 ### Download permissions issues
 
@@ -387,13 +297,6 @@ deploy:
       memory: 2G
 ```
 
-6. **Use read-only volumes** where possible:
-
-```yaml
-volumes:
-  - ./rtcstats-cli:/usr/local/rtcstats-cli:ro
-```
-
 ## Build Scripts Reference
 
 ### build.sh
@@ -421,7 +324,6 @@ IMAGE_NAME=mycompany/call-analytics TAG=latest ./build/build.sh
 
 Container entrypoint script:
 - Sources pre-run.sh for custom configuration
-- Validates rtcstats-cli installation
 - Creates required directories
 - Starts Node.js backend server
 
@@ -471,11 +373,10 @@ Consider integrating with Prometheus for metrics collection (future enhancement)
 
 ## Next Steps
 
-1. **Configure rtcstats-cli**: Set up proper credentials and test connectivity
-2. **Test end-to-end**: Download a conference dump and verify analysis
-3. **Set up monitoring**: Add Prometheus/Grafana integration
-4. **Production deployment**: Deploy to your container orchestration platform
-5. **Backup strategy**: Implement regular backups of downloaded dumps
+1. **Test end-to-end**: Download a conference dump and verify analysis
+2. **Set up monitoring**: Add Prometheus/Grafana integration
+3. **Production deployment**: Deploy to your container orchestration platform
+4. **Backup strategy**: Implement regular backups of downloaded dumps
 
 ## Support
 
