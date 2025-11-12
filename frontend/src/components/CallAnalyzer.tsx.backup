@@ -1,0 +1,786 @@
+/**
+ * Call Analyzer Component
+ * Input form for meeting URL and display of initial analysis
+ */
+
+import {
+    VolumeUp as AudioIcon,
+    Timer as LatencyIcon,
+    NetworkCheck as NetworkIcon,
+    Star as QualityIcon,
+    SignalWifi4Bar as SignalIcon,
+    Videocam as VideoIcon,
+    Schedule as DurationIcon,
+    People as PeopleIcon,
+    TrendingUp as TrendingIcon,
+    Domain as RoomIcon,
+    Error as MediaInterruptionIcon,
+    Refresh as IceRestartIcon,
+    CloudOff as StropheErrorIcon,
+    SignalWifi0Bar as JitterIcon,
+} from '@mui/icons-material';
+import {
+    Alert,
+    Box,
+    Button,
+    Card,
+    CardContent,
+    Chip,
+    CircularProgress,
+    Grid,
+    LinearProgress,
+    Paper,
+    TextField,
+    Typography,
+} from '@mui/material';
+import React, { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { EnhancedCard, MetricCard } from './EnhancedCard';
+
+import { CallSession } from '../../../shared/types';
+import { AnalysisService } from '../services/AnalysisService';
+
+interface ISessionStats {
+    backendComponents: {
+        jibris: string[];
+        jvbs: string[];
+        shards: string[];
+    };
+    meetingDuration: number;
+    peakConcurrent: number;
+    qualityMetrics: {
+        // 0-5 scale
+        audioQuality: number;
+        // milliseconds
+        avgJitter: number;
+        // 0-5 scale
+        avgPacketLoss: number;
+        // percentage
+        avgRTT: number;
+        // milliseconds
+        connectionSuccessRate: number;
+        // percentage
+        mediaInterruptions: number;
+        // 0-5 scale
+        networkStability: number;
+        overallScore: number;
+        // count
+        participantDropouts: number;
+        // 0-5 scale
+        videoQuality: number; // count
+    };
+    totalUsers: number;
+}
+
+interface IAnalysisResult {
+    session: CallSession;
+    stats: ISessionStats;
+    timeline: any;
+}
+
+const CallAnalyzer: React.FC = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [ meetingUrl, setMeetingUrl ] = useState('');
+    const [ loading, setLoading ] = useState(false);
+    const [ error, setError ] = useState<string | null>(null);
+    const [ result, setResult ] = useState<IAnalysisResult | null>(
+        location.state?.analysisResult || null,
+    );
+
+    const handleAnalyze = async () => {
+        if (!meetingUrl.trim()) {
+            setError('Please enter a meeting URL');
+
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const analysisResult
+                = await AnalysisService.analyzeMeeting(meetingUrl);
+
+            setResult(analysisResult);
+        } catch (err) {
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : 'Failed to analyze meeting',
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleViewTimeline = () => {
+        if (result?.session.sessionId) {
+            // Open timeline in new tab with session info in URL
+            const roomName = result.session.roomName || '';
+            const timelineUrl = `/call/${result.session.sessionId}?roomName=${encodeURIComponent(roomName)}`;
+
+            window.open(timelineUrl, '_blank');
+        }
+    };
+
+    const handleJVBClick = (jvbInstance: string) => {
+        // Open JVB details in new tab with session info in URL
+        const roomName = result?.session.roomName || '';
+        const sessionId = result?.session.sessionId || '';
+        const jvbUrl = `/jvb/${encodeURIComponent(jvbInstance)}?sessionId=${sessionId}&roomName=${encodeURIComponent(roomName)}`;
+
+        window.open(jvbUrl, '_blank');
+    };
+
+    const handleShardClick = (shardInstance: string) => {
+        // Open Jicofo details in new tab with session info in URL
+        const roomName = result?.session.roomName || '';
+        const sessionId = result?.session.sessionId || '';
+        const shardUrl = `/jicofo/${encodeURIComponent(shardInstance)}?sessionId=${sessionId}&roomName=${encodeURIComponent(roomName)}`;
+
+        window.open(shardUrl, '_blank');
+    };
+
+    const formatDuration = (ms: number) => {
+        const minutes = Math.floor(ms / 60000);
+        const seconds = Math.floor((ms % 60000) / 1000);
+
+        return `${minutes}m ${seconds}s`;
+    };
+
+    const getQualityColor = (
+            score: number,
+    ): 'success' | 'warning' | 'error' => {
+        if (score >= 4) return 'success';
+        if (score >= 2.5) return 'warning';
+
+        return 'error';
+    };
+
+    const getQualityLabel = (score: number): string => {
+        if (score >= 4.5) return 'Excellent';
+        if (score >= 4) return 'Good';
+        if (score >= 3) return 'Fair';
+        if (score >= 2) return 'Poor';
+
+        return 'Very Poor';
+    };
+
+    return (
+        <Box>
+            {/* Hero Section */}
+            <Box sx = {{ mb: 4 }}>
+                <Typography
+                    variant = 'h3'
+                    gutterBottom
+                    sx = {{
+                        fontWeight: 600,
+                        background: 'linear-gradient(135deg, #1e88e5 0%, #1976d2 100%)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        mb: 2
+                    }}>
+                    Meeting Call Analyzer
+                </Typography>
+                <Typography
+                    variant = 'h6'
+                    color = 'text.secondary'
+                    sx = {{
+                        fontWeight: 400,
+                        maxWidth: '800px'
+                    }}>
+                    Enterprise-grade analytics for Jitsi Meet conferences. Analyze call performance,
+                    participant behavior, and infrastructure utilization with professional insights.
+                </Typography>
+            </Box>
+
+            <Alert
+                severity = 'info'
+                sx = {{
+                    mb: 4,
+                    background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(255, 255, 255, 0.9) 100%)',
+                    border: '1px solid rgba(33, 150, 243, 0.2)',
+                }}>
+                <Typography variant = 'subtitle2' sx = {{ fontWeight: 600 }}>
+                    Enterprise Test Environment
+                </Typography>
+                <Typography variant = 'body2'>
+                    Currently analyzing real conference data from secure local repositories.
+                    Switch to production RTCStats server integration for live analysis.
+                </Typography>
+            </Alert>
+
+            <EnhancedCard sx = {{ p: 4, mb: 4 }} gradient>
+                <Box sx = {{ display: 'flex', gap: 2, mb: 2 }}>
+                    <TextField
+                        fullWidth
+                        label = 'Meeting URL'
+                        placeholder = 'https://meet.jit.si/your-room-name'
+                        value = { meetingUrl }
+                        onChange = { e => setMeetingUrl(e.target.value) }
+                        disabled = { loading }
+                        error = { !!error && !loading }/>
+                    <Button
+                        variant = 'contained'
+                        onClick = { handleAnalyze }
+                        disabled = { loading || !meetingUrl.trim() }
+                        sx = {{ minWidth: 120 }}>
+                        {loading ? <CircularProgress size = { 24 } /> : 'Analyze'}
+                    </Button>
+                </Box>
+
+                {error && (
+                    <Alert severity = 'error' sx = {{ mb: 2 }}>
+                        {error}
+                    </Alert>
+                )}
+            </EnhancedCard>
+
+            {result && (
+                <Box>
+                    <Box
+                        display = 'flex'
+                        justifyContent = 'space-between'
+                        alignItems = 'center'
+                        mb = { 2 }>
+                        <Typography variant = 'h5'>Analysis Results</Typography>
+                        {location.state?.analysisResult && (
+                            <Button
+                                variant = 'outlined'
+                                onClick = { () => {
+                                    setResult(null);
+                                    setMeetingUrl('');
+                                    setError(null);
+                                    // Clear the navigation state
+                                    navigate('/', { replace: true });
+                                } }>
+                                New Analysis
+                            </Button>
+                        )}
+                    </Box>
+
+                    <Grid container spacing = { 3 } sx = {{ mb: 4 }}>
+                        <Grid item xs = { 12 } sm = { 6 } md = { 3 }>
+                            <MetricCard
+                                icon = { <DurationIcon /> }
+                                title = "Meeting Duration"
+                                value = { formatDuration(result.stats.meetingDuration) }
+                                subtitle = "Total session time"
+                                color = "primary"
+                            />
+                        </Grid>
+
+                        <Grid item xs = { 12 } sm = { 6 } md = { 3 }>
+                            <MetricCard
+                                icon = { <PeopleIcon /> }
+                                title = "Total Users"
+                                value = { result.stats.totalUsers }
+                                subtitle = "Unique participants"
+                                color = "success"
+                                trend = "up"
+                            />
+                        </Grid>
+
+                        <Grid item xs = { 12 } sm = { 6 } md = { 3 }>
+                            <MetricCard
+                                icon = { <TrendingIcon /> }
+                                title = "Peak Concurrent"
+                                value = { result.stats.peakConcurrent }
+                                subtitle = "Maximum simultaneous users"
+                                color = "warning"
+                            />
+                        </Grid>
+
+                        <Grid item xs = { 12 } sm = { 6 } md = { 3 }>
+                            <MetricCard
+                                icon = { <RoomIcon /> }
+                                title = "Room Name"
+                                value = { result.session.roomName || 'N/A' }
+                                subtitle = "Meeting identifier"
+                                color = "primary"
+                            />
+                        </Grid>
+                    </Grid>
+
+                    {/* Call Quality Indicators */}
+                    <Paper sx = {{ p: 3, mb: 3 }}>
+                        <Typography variant = 'h6' gutterBottom>
+                            Conference Statistics
+                        </Typography>
+
+                        {/* Overall Quality Score */}
+                        <Box sx = {{ mb: 3 }}>
+                            <Box
+                                display = 'flex'
+                                alignItems = 'center'
+                                gap = { 1 }
+                                mb = { 1 }>
+                                <QualityIcon color = 'primary' />
+                                <Typography variant = 'h6'>
+                                    Overall Call Quality:{' '}
+                                    {getQualityLabel(
+                                        result.stats.qualityMetrics
+                                            .overallScore,
+                                    )}
+                                </Typography>
+                                <Chip
+                                    label = { `${result.stats.qualityMetrics.overallScore.toFixed(1)}/5.0` }
+                                    color = { getQualityColor(
+                                        result.stats.qualityMetrics
+                                            .overallScore,
+                                    ) }
+                                    size = 'medium'/>
+                            </Box>
+                            <LinearProgress
+                                variant = 'determinate'
+                                value = {
+                                    (result.stats.qualityMetrics.overallScore
+                                        / 5)
+                                    * 100
+                                }
+                                color = { getQualityColor(
+                                    result.stats.qualityMetrics.overallScore,
+                                ) }
+                                sx = {{ height: 10, borderRadius: 5, mb: 2 }}/>
+                        </Box>
+
+                        {/* Quality Metrics Grid */}
+                        <Grid container spacing = { 3 } sx = {{ mb: 3 }}>
+                            {/* Audio Quality */}
+                            <Grid item xs = { 12 } md = { 4 }>
+                                <Card variant = 'outlined'>
+                                    <CardContent>
+                                        <Box
+                                            display = 'flex'
+                                            alignItems = 'center'
+                                            gap = { 1 }
+                                            mb = { 2 }>
+                                            <AudioIcon color = 'primary' />
+                                            <Typography variant = 'h6'>
+                                                Audio Quality
+                                            </Typography>
+                                        </Box>
+                                        <Box
+                                            display = 'flex'
+                                            justifyContent = 'space-between'
+                                            alignItems = 'center'
+                                            mb = { 1 }>
+                                            <Typography variant = 'body2'>
+                                                Score
+                                            </Typography>
+                                            <Typography
+                                                variant = 'h6'
+                                                color = { getQualityColor(
+                                                    result.stats.qualityMetrics
+                                                        .audioQuality,
+                                                ) }>
+                                                {result.stats.qualityMetrics.audioQuality.toFixed(
+                                                    1,
+                                                )}
+                                                /5.0
+                                            </Typography>
+                                        </Box>
+                                        <LinearProgress
+                                            variant = 'determinate'
+                                            value = {
+                                                (result.stats.qualityMetrics
+                                                    .audioQuality
+                                                    / 5)
+                                                * 100
+                                            }
+                                            color = { getQualityColor(
+                                                result.stats.qualityMetrics
+                                                    .audioQuality,
+                                            ) }
+                                            sx = {{ height: 8, borderRadius: 4 }}/>
+                                        <Typography
+                                            variant = 'body2'
+                                            color = 'textSecondary'
+                                            sx = {{ mt: 1 }}>
+                                            {getQualityLabel(
+                                                result.stats.qualityMetrics
+                                                    .audioQuality,
+                                            )}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+
+                            {/* Video Quality */}
+                            <Grid item xs = { 12 } md = { 4 }>
+                                <Card variant = 'outlined'>
+                                    <CardContent>
+                                        <Box
+                                            display = 'flex'
+                                            alignItems = 'center'
+                                            gap = { 1 }
+                                            mb = { 2 }>
+                                            <VideoIcon color = 'secondary' />
+                                            <Typography variant = 'h6'>
+                                                Video Quality
+                                            </Typography>
+                                        </Box>
+                                        <Box
+                                            display = 'flex'
+                                            justifyContent = 'space-between'
+                                            alignItems = 'center'
+                                            mb = { 1 }>
+                                            <Typography variant = 'body2'>
+                                                Score
+                                            </Typography>
+                                            <Typography
+                                                variant = 'h6'
+                                                color = { getQualityColor(
+                                                    result.stats.qualityMetrics
+                                                        .videoQuality,
+                                                ) }>
+                                                {result.stats.qualityMetrics.videoQuality.toFixed(
+                                                    1,
+                                                )}
+                                                /5.0
+                                            </Typography>
+                                        </Box>
+                                        <LinearProgress
+                                            variant = 'determinate'
+                                            value = {
+                                                (result.stats.qualityMetrics
+                                                    .videoQuality
+                                                    / 5)
+                                                * 100
+                                            }
+                                            color = { getQualityColor(
+                                                result.stats.qualityMetrics
+                                                    .videoQuality,
+                                            ) }
+                                            sx = {{ height: 8, borderRadius: 4 }}/>
+                                        <Typography
+                                            variant = 'body2'
+                                            color = 'textSecondary'
+                                            sx = {{ mt: 1 }}>
+                                            {getQualityLabel(
+                                                result.stats.qualityMetrics
+                                                    .videoQuality,
+                                            )}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+
+                            {/* Network Stability */}
+                            <Grid item xs = { 12 } md = { 4 }>
+                                <Card variant = 'outlined'>
+                                    <CardContent>
+                                        <Box
+                                            display = 'flex'
+                                            alignItems = 'center'
+                                            gap = { 1 }
+                                            mb = { 2 }>
+                                            <NetworkIcon color = 'success' />
+                                            <Typography variant = 'h6'>
+                                                Network Stability
+                                            </Typography>
+                                        </Box>
+                                        <Box
+                                            display = 'flex'
+                                            justifyContent = 'space-between'
+                                            alignItems = 'center'
+                                            mb = { 1 }>
+                                            <Typography variant = 'body2'>
+                                                Score
+                                            </Typography>
+                                            <Typography
+                                                variant = 'h6'
+                                                color = { getQualityColor(
+                                                    result.stats.qualityMetrics
+                                                        .networkStability,
+                                                ) }>
+                                                {result.stats.qualityMetrics.networkStability.toFixed(
+                                                    1,
+                                                )}
+                                                /5.0
+                                            </Typography>
+                                        </Box>
+                                        <LinearProgress
+                                            variant = 'determinate'
+                                            value = {
+                                                (result.stats.qualityMetrics
+                                                    .networkStability
+                                                    / 5)
+                                                * 100
+                                            }
+                                            color = { getQualityColor(
+                                                result.stats.qualityMetrics
+                                                    .networkStability,
+                                            ) }
+                                            sx = {{ height: 8, borderRadius: 4 }}/>
+                                        <Typography
+                                            variant = 'body2'
+                                            color = 'textSecondary'
+                                            sx = {{ mt: 1 }}>
+                                            {getQualityLabel(
+                                                result.stats.qualityMetrics
+                                                    .networkStability,
+                                            )}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        </Grid>
+
+                        {/* Performance Metrics */}
+                        <Typography variant = 'h6' gutterBottom sx = {{ mt: 2 }}>
+                            Performance Metrics
+                        </Typography>
+                        <Grid container spacing = { 3 }>
+                            <Grid item xs = { 6 } md = { 2 }>
+                                <Box textAlign = 'center'>
+                                    <SignalIcon
+                                        color = 'action'
+                                        sx = {{ fontSize: 32, mb: 1 }}/>
+                                    <Typography
+                                        variant = 'body2'
+                                        color = 'textSecondary'>
+                                        Packet Loss
+                                    </Typography>
+                                    <Typography
+                                        variant = 'h6'
+                                        color = {
+                                            result.stats.qualityMetrics
+                                                .avgPacketLoss > 2
+                                                ? 'error'
+                                                : 'success'
+                                        }>
+                                        {result.stats.qualityMetrics.avgPacketLoss.toFixed(
+                                            1,
+                                        )}
+                                        %
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid item xs = { 6 } md = { 2 }>
+                                <Box textAlign = 'center'>
+                                    <LatencyIcon
+                                        color = 'action'
+                                        sx = {{ fontSize: 32, mb: 1 }}/>
+                                    <Typography
+                                        variant = 'body2'
+                                        color = 'textSecondary'>
+                                        Avg RTT
+                                    </Typography>
+                                    <Typography
+                                        variant = 'h6'
+                                        color = {
+                                            result.stats.qualityMetrics.avgRTT
+                                            > 150
+                                                ? 'error'
+                                                : 'success'
+                                        }>
+                                        {result.stats.qualityMetrics.avgRTT}ms
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid item xs = { 6 } md = { 2 }>
+                                <Box textAlign = 'center'>
+                                    <SignalIcon
+                                        color = 'action'
+                                        sx = {{ fontSize: 32, mb: 1 }}/>
+                                    <Typography
+                                        variant = 'body2'
+                                        color = 'textSecondary'>
+                                        Avg Jitter
+                                    </Typography>
+                                    <Typography
+                                        variant = 'h6'
+                                        color = {
+                                            result.stats.qualityMetrics
+                                                .avgJitter > 30
+                                                ? 'error'
+                                                : 'success'
+                                        }>
+                                        {result.stats.qualityMetrics.avgJitter}
+                                        ms
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid item xs = { 6 } md = { 2 }>
+                                <Box textAlign = 'center'>
+                                    <NetworkIcon
+                                        color = 'action'
+                                        sx = {{ fontSize: 32, mb: 1 }}/>
+                                    <Typography
+                                        variant = 'body2'
+                                        color = 'textSecondary'>
+                                        Connection Success
+                                    </Typography>
+                                    <Typography
+                                        variant = 'h6'
+                                        color = {
+                                            result.stats.qualityMetrics
+                                                .connectionSuccessRate < 95
+                                                ? 'error'
+                                                : 'success'
+                                        }>
+                                        {result.stats.qualityMetrics.connectionSuccessRate.toFixed(
+                                            1,
+                                        )}
+                                        %
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid item xs = { 6 } md = { 2 }>
+                                <Box textAlign = 'center'>
+                                    <Typography
+                                        variant = 'h6'
+                                        color = 'action'
+                                        sx = {{ fontSize: 32, mb: 1 }}>
+                                        📞
+                                    </Typography>
+                                    <Typography
+                                        variant = 'body2'
+                                        color = 'textSecondary'>
+                                        Media Interruptions
+                                    </Typography>
+                                    <Typography
+                                        variant = 'h6'
+                                        color = {
+                                            result.stats.qualityMetrics
+                                                .mediaInterruptions > 5
+                                                ? 'error'
+                                                : 'success'
+                                        }>
+                                        {
+                                            result.stats.qualityMetrics
+                                                .mediaInterruptions
+                                        }
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid item xs = { 6 } md = { 2 }>
+                                <Box textAlign = 'center'>
+                                    <Typography
+                                        variant = 'h6'
+                                        color = 'action'
+                                        sx = {{ fontSize: 32, mb: 1 }}>
+                                        👥
+                                    </Typography>
+                                    <Typography
+                                        variant = 'body2'
+                                        color = 'textSecondary'>
+                                        Participant Dropouts
+                                    </Typography>
+                                    <Typography
+                                        variant = 'h6'
+                                        color = {
+                                            result.stats.qualityMetrics
+                                                .participantDropouts > 2
+                                                ? 'error'
+                                                : 'success'
+                                        }>
+                                        {
+                                            result.stats.qualityMetrics
+                                                .participantDropouts
+                                        }
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                        </Grid>
+                    </Paper>
+
+                    <Paper sx = {{ p: 3, mb: 3 }}>
+                        <Typography variant = 'h6' gutterBottom>
+                            Backend Components Used
+                        </Typography>
+
+                        <Box sx = {{ mb: 2 }}>
+                            <Typography variant = 'subtitle2' gutterBottom>
+                                JVB Instances
+                            </Typography>
+                            <Box
+                                sx = {{
+                                    display: 'flex',
+                                    gap: 1,
+                                    flexWrap: 'wrap',
+                                }}>
+                                {result.stats.backendComponents.jvbs.map(
+                                    (jvb, index) => (
+                                        <Chip
+                                            key = { index }
+                                            label = { jvb }
+                                            color = 'primary'
+                                            variant = 'outlined'
+                                            clickable
+                                            onClick = { () => handleJVBClick(jvb) }/>
+                                    ),
+                                )}
+                            </Box>
+                        </Box>
+
+                        <Box sx = {{ mb: 2 }}>
+                            <Typography variant = 'subtitle2' gutterBottom>
+                                Shards
+                            </Typography>
+                            <Box
+                                sx = {{
+                                    display: 'flex',
+                                    gap: 1,
+                                    flexWrap: 'wrap',
+                                }}>
+                                {result.stats.backendComponents.shards.map(
+                                    (shard, index) => (
+                                        <Chip
+                                            key = { index }
+                                            label = { shard }
+                                            color = 'secondary'
+                                            variant = 'outlined'
+                                            clickable
+                                            onClick = { () =>
+                                                handleShardClick(shard)
+                                            }/>
+                                    ),
+                                )}
+                            </Box>
+                        </Box>
+
+                        {result.stats.backendComponents.jibris.length > 0 && (
+                            <Box sx = {{ mb: 2 }}>
+                                <Typography variant = 'subtitle2' gutterBottom>
+                                    Jibri Instances (Recording/Streaming)
+                                </Typography>
+                                <Box
+                                    sx = {{
+                                        display: 'flex',
+                                        gap: 1,
+                                        flexWrap: 'wrap',
+                                    }}>
+                                    {result.stats.backendComponents.jibris.map(
+                                        (jibri, index) => (
+                                            <Chip
+                                                key = { index }
+                                                label = { jibri }
+                                                color = 'success'
+                                                variant = 'outlined'/>
+                                        ),
+                                    )}
+                                </Box>
+                            </Box>
+                        )}
+                    </Paper>
+
+                    <Box sx = {{ textAlign: 'center' }}>
+                        <Button
+                            variant = 'contained'
+                            size = 'large'
+                            onClick = { handleViewTimeline }
+                            sx = {{ px: 4 }}>
+                            View Detailed Timeline
+                        </Button>
+                    </Box>
+                </Box>
+            )}
+        </Box>
+    );
+};
+
+export default CallAnalyzer;

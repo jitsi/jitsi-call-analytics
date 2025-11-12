@@ -1,0 +1,12 @@
+{
+  "watch": ["src"],
+  "ext": "ts,json",
+  "ignore": [
+    "rtcstats-downloads/**",
+    "node_modules/**",
+    "dist/**",
+    "test/**",
+    "**/*.test.ts"
+  ],
+  "exec": "tsx src/index.ts"
+}

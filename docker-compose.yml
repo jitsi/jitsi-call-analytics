@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  call-analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jitsi/call-analytics:latest
+    container_name: jitsi-call-analytics
+    ports:
+      - "5000:5000"
+    environment:
+      # Application
+      - NODE_ENV=production
+      - PORT=5000
+
+      # RTCStats Configuration
+      - RTCSTATS_CLI_PATH=/usr/local/rtcstats-cli/bin/rtcstats.sh
+      - RTCSTATS_DOWNLOADS_PATH=/data/rtcstats-downloads
+      - RTCSTATS_ENV=prod
+      - RTCSTATS_MAX_DOWNLOADS=3
+      - RTCSTATS_TIMEOUT=600000
+      - RTCSTATS_CLEANUP_DAYS=7
+
+      # PostgreSQL for rtcstats-cli (required for search)
+      - RTCSTATS_DB_HOST=${RTCSTATS_DB_HOST}
+      - RTCSTATS_DB_PORT=${RTCSTATS_DB_PORT:-5432}
+      - RTCSTATS_DB_USER=${RTCSTATS_DB_USER}
+      - RTCSTATS_DB_PASSWORD=${RTCSTATS_DB_PASSWORD}
+      - RTCSTATS_DB_NAME=${RTCSTATS_DB_NAME:-rtcstats}
+
+      # AWS credentials for rtcstats-cli S3 access (required for downloads)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-us-west-2}
+      - AWS_DEFAULT_REGION=${AWS_REGION:-us-west-2}
+    volumes:
+      # Persist downloaded conference dumps
+      - rtcstats-downloads:/data/rtcstats-downloads
+
+      # Mount rtcstats-cli if you have it locally (for development)
+      - ${RTCSTATS_CLI_LOCAL_PATH:-./rtcstats-cli}:/usr/local/rtcstats-cli:ro
+
+      # Mount pre-run script for custom configuration (optional)
+      # - ./build/pre-run.sh:/usr/jitsi/pre-run.sh:ro
+
+      # Mount secrets (optional)
+      # - ./secrets:/run/secrets:ro
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Optional: Add resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Optional: PostgreSQL for rtcstats-cli
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: jitsi-call-analytics-db
+  #   environment:
+  #     - POSTGRES_USER=rtcstats
+  #     - POSTGRES_PASSWORD=changeme
+  #     - POSTGRES_DB=rtcstats
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   restart: unless-stopped
+
+volumes:
+  rtcstats-downloads:
+    driver: local
+  # postgres-data:
+  #   driver: local
+
+networks:
+  default:
+    name: jitsi-call-analytics

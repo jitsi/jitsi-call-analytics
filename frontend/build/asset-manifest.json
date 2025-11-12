@@ -1,0 +1,10 @@
+{
+  "files": {
+    "main.js": "/jitsi-call-analytics/static/js/main.3b8138a5.js",
+    "index.html": "/jitsi-call-analytics/index.html",
+    "main.3b8138a5.js.map": "/jitsi-call-analytics/static/js/main.3b8138a5.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.3b8138a5.js"
+  ]
+}

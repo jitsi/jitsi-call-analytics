@@ -1,0 +1,53 @@
+{
+  "name": "@jitsi/call-analytics",
+  "version": "1.0.0",
+  "description": "Next-generation Jitsi Meet call analytics platform with unified timeline and multi-source data integration",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "npm run build --workspace backend",
+    "build:frontend": "npm run build --workspace frontend",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "npm run lint --workspace backend",
+    "lint:frontend": "npm run lint --workspace frontend",
+    "lint:fix": "npm run lint:fix:backend && npm run lint:fix:frontend",
+    "lint:fix:backend": "npm run lint:fix --workspace backend",
+    "lint:fix:frontend": "npm run lint:fix --workspace frontend",
+    "start": "npm start --workspace backend",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "npm test --workspace backend",
+    "test:frontend": "npm test --workspace frontend"
+  },
+  "keywords": [
+    "jitsi",
+    "analytics",
+    "webrtc",
+    "rtcstats",
+    "call-quality",
+    "monitoring"
+  ],
+  "author": "Jitsi Analytics Team",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "@jitsi/eslint-config": "^6.0.4",
+    "@tsconfig/node24": "^24.0.1",
+    "@types/node": "^20.5.0",
+    "babel-eslint": "^10.1.0",
+    "concurrently": "^8.2.2",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsdoc": "^58.1.0",
+    "eslint-plugin-typescript-sort-keys": "^2.3.0"
+  },
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ]
+}

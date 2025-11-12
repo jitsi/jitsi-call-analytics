@@ -1,0 +1,105 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - master
+      - main
+
+jobs:
+  pr-validation:
+    name: PR Validation
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for better diff analysis
+
+      - name: Check PR title
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "PR Title: $PR_TITLE"
+
+          # Check if title is not empty and has reasonable length
+          if [ ${#PR_TITLE} -lt 5 ]; then
+            echo "PR title is too short (minimum 5 characters)"
+            exit 1
+          fi
+
+          if [ ${#PR_TITLE} -gt 100 ]; then
+            echo "PR title is quite long (>100 characters)"
+          fi
+
+          echo "PR title is valid"
+
+      - name: Check for merge conflicts
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          # Fetch base branch
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+
+          # Try to merge base into current branch
+          if git merge --no-commit --no-ff origin/${{ github.event.pull_request.base.ref }}; then
+            echo "No merge conflicts detected"
+            git merge --abort 2>/dev/null || true
+          else
+            echo "Merge conflicts detected"
+            git merge --abort 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Check changed files
+        id: changed-files
+        run: |
+          # Get list of changed files
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD)
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Count changes by area
+          BACKEND_CHANGES=$(echo "$CHANGED_FILES" | grep -c "^backend/" || true)
+          FRONTEND_CHANGES=$(echo "$CHANGED_FILES" | grep -c "^frontend/" || true)
+          SHARED_CHANGES=$(echo "$CHANGED_FILES" | grep -c "^shared/" || true)
+
+          echo "backend_changes=$BACKEND_CHANGES" >> $GITHUB_OUTPUT
+          echo "frontend_changes=$FRONTEND_CHANGES" >> $GITHUB_OUTPUT
+          echo "shared_changes=$SHARED_CHANGES" >> $GITHUB_OUTPUT
+
+          echo "Changes: Backend=$BACKEND_CHANGES, Frontend=$FRONTEND_CHANGES, Shared=$SHARED_CHANGES"
+
+      - name: Add PR comment with summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const backendChanges = ${{ steps.changed-files.outputs.backend_changes }};
+            const frontendChanges = ${{ steps.changed-files.outputs.frontend_changes }};
+            const sharedChanges = ${{ steps.changed-files.outputs.shared_changes }};
+
+            const body = `## PR Analysis
+
+            **Changes detected:**
+            - Backend: ${backendChanges} files
+            - Frontend: ${frontendChanges} files
+            - Shared: ${sharedChanges} files
+
+            **CI Status:**
+            - PR validation passed
+            - Build and tests running...
+
+            The branch will be automatically deleted after merge.
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

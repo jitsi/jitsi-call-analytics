@@ -1,0 +1,55 @@
+# Codecov Configuration
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        # Allow coverage to drop by 1% without failing
+        if_ci_failed: error
+
+    patch:
+      default:
+        target: 80%
+        # Require 80% coverage on new code
+        if_ci_failed: error
+
+  precision: 2
+  round: down
+  range: "70...100"
+
+# Ignore files/directories
+ignore:
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/__tests__/**"
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/*.d.ts"
+
+# Comment on PRs
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+
+# Flags for different parts of the codebase
+flags:
+  backend:
+    paths:
+      - backend/src/
+    carryforward: true
+
+  frontend:
+    paths:
+      - frontend/src/
+    carryforward: true

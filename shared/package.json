@@ -1,0 +1,10 @@
+{
+  "name": "@jitsi/analytics-shared",
+  "version": "1.0.0",
+  "description": "Shared types, interfaces, and utilities for Jitsi Call Analytics",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  }
+}

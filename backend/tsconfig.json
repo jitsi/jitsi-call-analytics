@@ -1,0 +1,23 @@
+{
+    "extends": "@tsconfig/node24/tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./dist",
+        "rootDir": "../",
+        "target": "ES2020",
+        "module": "commonjs",
+        "lib": ["ES2020"],
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "allowJs": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "moduleResolution": "node"
+    },
+    "include": ["src/**/*", "../shared/**/*", "@types/**/*"],
+    "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}
