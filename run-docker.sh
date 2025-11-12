@@ -14,7 +14,6 @@ export AWS_SECRET_ACCESS_KEY="your-secret-key-here"
 export AWS_REGION="us-west-2"
 
 # RTCStats Configuration
-# Note: RTCSTATS_CLI_PATH is set in the Dockerfile, but can be overridden here if needed
 export RTCSTATS_DOWNLOADS_PATH="/data/rtcstats-downloads"
 export RTCSTATS_ENV="prod"
 
