@@ -8,6 +8,7 @@
 import { getLogger } from '@jitsi/logger';
 
 import { RTCStatsEnvironment } from '../../../shared/types/rtcstats';
+
 import { DynamoDBMetadataService, IDynamoDBConfig } from './DynamoDBMetadataService';
 import { RedshiftDataAPIService } from './RedshiftDataAPIService';
 
