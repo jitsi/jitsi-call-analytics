@@ -8,9 +8,6 @@
  */
 
 import * as path from 'path';
-
-import { RTCStatsEnvironment } from '../../../shared/types/rtcstats';
-
 export interface IRTCStatsConfig {
     aws: {
         accessKeyId?: string;
