@@ -8,6 +8,8 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { getLogger } from '@jitsi/logger';
 
+import { RTCStatsEnvironment } from '../../../shared/types/rtcstats';
+
 const logger = getLogger('backend/src/services/DynamoDBMetadataService');
 
 export interface IDynamoDBConfig {
@@ -75,11 +77,11 @@ export class DynamoDBMetadataService {
     /**
      * Get table name for environment.
      *
-     * @param {string} environment - Environment (prod/pilot)
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT)
      * @returns {string} Table name
      * @private
      */
-    private getTableName(environment: 'prod' | 'pilot' = 'pilot'): string {
+    private getTableName(environment: RTCStatsEnvironment): string {
         return this.config.tables[environment];
     }
 
@@ -137,10 +139,10 @@ export class DynamoDBMetadataService {
     /**
      * Test connection to DynamoDB.
      *
-     * @param {string} environment - Environment to test (defaults to pilot)
+     * @param {RTCStatsEnvironment} environment - Environment to test (defaults to PILOT)
      * @returns {Promise<boolean>} True if connection successful
      */
-    async testConnection(environment: 'prod' | 'pilot' = 'pilot'): Promise<boolean> {
+    async testConnection(environment: RTCStatsEnvironment = RTCStatsEnvironment.PILOT): Promise<boolean> {
         try {
             // Try to scan with limit 1 to test permissions
             const command = new ScanCommand({
@@ -163,14 +165,14 @@ export class DynamoDBMetadataService {
      * Search for conferences by URL pattern.
      *
      * @param {string} conferenceUrl - Conference URL or pattern to search
-     * @param {number} maxAgeDays - Maximum age of conferences to search (default: 30)
-     * @param {string} environment - Environment (prod/pilot) - defaults to pilot
+     * @param {number} maxAgeDays - Maximum age of conferences to search
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IConferenceMetadata[]>} Array of matching conferences
      */
     async searchConferences(
             conferenceUrl: string,
-            maxAgeDays = 30,
-            environment: 'prod' | 'pilot' = 'pilot'
+            maxAgeDays: number,
+            environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
         logger.info('Searching conferences in DynamoDB', {
             conferenceUrl,
@@ -246,12 +248,12 @@ export class DynamoDBMetadataService {
      * Get conference by unique ID.
      *
      * @param {string} meetingUniqueId - Conference unique identifier
-     * @param {string} environment - Environment (prod/pilot) - defaults to pilot
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IConferenceMetadata[]>} Conference metadata for all participants
      */
     async getConferenceById(
             meetingUniqueId: string,
-            environment: 'prod' | 'pilot' = 'pilot'
+            environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
         logger.info('Getting conference by ID from DynamoDB', { environment, meetingUniqueId });
 
@@ -304,12 +306,12 @@ export class DynamoDBMetadataService {
      * Get conference by session ID (UUID).
      *
      * @param {string} sessionId - Session ID (UUID)
-     * @param {string} environment - Environment (prod/pilot) - defaults to pilot
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IConferenceMetadata[]>} Session metadata
      */
     async getConferenceBySessionId(
             sessionId: string,
-            environment: 'prod' | 'pilot' = 'pilot'
+            environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
         logger.info('Getting conference by session ID from DynamoDB', { environment, sessionId });
 
@@ -346,12 +348,12 @@ export class DynamoDBMetadataService {
      * List participants for a conference.
      *
      * @param {string} meetingUniqueId - Conference unique identifier
-     * @param {string} environment - Environment (prod/pilot) - defaults to pilot
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IConferenceMetadata[]>} Array of participants
      */
     async listParticipants(
             meetingUniqueId: string,
-            environment: 'prod' | 'pilot' = 'pilot'
+            environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
         // Same as getConferenceById for DynamoDB
         return this.getConferenceById(meetingUniqueId, environment);

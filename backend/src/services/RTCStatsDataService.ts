@@ -7,8 +7,7 @@
 
 import { getLogger } from '@jitsi/logger';
 
-import { rtcstatsConfig } from '../config/rtcstats';
-
+import { RTCStatsEnvironment } from '../../../shared/types/rtcstats';
 import { DynamoDBMetadataService, IDynamoDBConfig } from './DynamoDBMetadataService';
 import { RedshiftDataAPIService } from './RedshiftDataAPIService';
 
@@ -21,9 +20,17 @@ export interface IRedshiftConfig {
     workgroupName?: string;
 }
 
+export interface IRedshiftClustersConfig {
+    clusters: {
+        pilot: IRedshiftConfig;
+        prod: IRedshiftConfig;
+    };
+    region: string;
+}
+
 export interface IRTCStatsConfig {
     dynamodb?: IDynamoDBConfig;
-    redshift?: IRedshiftConfig;
+    redshift?: IRedshiftClustersConfig;
     useDynamoDB: boolean;
 }
 
@@ -76,7 +83,7 @@ export interface IServerMetadata {
  */
 export class RTCStatsDataService {
     private dynamoDBService?: DynamoDBMetadataService;
-    private redshiftClient?: RedshiftDataAPIService;
+    private redshiftClients: Map<RTCStatsEnvironment, RedshiftDataAPIService>;
     private useDynamoDB: boolean;
 
     /**
@@ -86,6 +93,7 @@ export class RTCStatsDataService {
      */
     constructor(private config: IRTCStatsConfig) {
         this.useDynamoDB = config.useDynamoDB;
+        this.redshiftClients = new Map();
 
         if (this.useDynamoDB && config.dynamodb) {
             logger.info('Initializing RTCStatsDataService with DynamoDB', {
@@ -94,15 +102,50 @@ export class RTCStatsDataService {
             });
             this.dynamoDBService = new DynamoDBMetadataService(config.dynamodb);
         } else if (config.redshift) {
-            logger.info('Initializing RTCStatsDataService with Redshift', {
-                clusterIdentifier: config.redshift.clusterIdentifier,
-                database: config.redshift.database,
-                region: config.redshift.region
-            });
-            this.redshiftClient = new RedshiftDataAPIService(config.redshift);
+            // Initialize Redshift clients for each environment
+            const pilotCluster = config.redshift.clusters.pilot;
+            const prodCluster = config.redshift.clusters.prod;
+
+            if (pilotCluster.clusterIdentifier) {
+                logger.info('Initializing RTCStatsDataService with Redshift (pilot)', {
+                    clusterIdentifier: pilotCluster.clusterIdentifier,
+                    database: pilotCluster.database
+                });
+                this.redshiftClients.set(RTCStatsEnvironment.PILOT, new RedshiftDataAPIService(pilotCluster));
+            }
+
+            if (prodCluster.clusterIdentifier) {
+                logger.info('Initializing RTCStatsDataService with Redshift (prod)', {
+                    clusterIdentifier: prodCluster.clusterIdentifier,
+                    database: prodCluster.database
+                });
+                this.redshiftClients.set(RTCStatsEnvironment.PROD, new RedshiftDataAPIService(prodCluster));
+            }
+
+            if (this.redshiftClients.size === 0) {
+                throw new Error('No Redshift clusters configured');
+            }
         } else {
             throw new Error('RTCStatsDataService requires either DynamoDB or Redshift configuration');
         }
+    }
+
+    /**
+     * Get Redshift client for the specified environment.
+     * If only one cluster is configured (prod mode), returns that client regardless of environment.
+     *
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT)
+     * @returns {RedshiftDataAPIService | undefined} Redshift client
+     * @private
+     */
+    private getRedshiftClient(environment: RTCStatsEnvironment): RedshiftDataAPIService | undefined {
+        // If only one cluster configured, use it for all environments (prod mode)
+        if (this.redshiftClients.size === 1) {
+            return Array.from(this.redshiftClients.values())[0];
+        }
+
+        // Otherwise, use environment-specific client
+        return this.redshiftClients.get(environment);
     }
 
     /**
@@ -150,13 +193,18 @@ export class RTCStatsDataService {
                     throw new Error('DynamoDB connection test failed');
                 }
                 logger.info('Connected to DynamoDB successfully');
-            } else if (this.redshiftClient) {
-                const isConnected = await this.redshiftClient.testConnection();
+            } else if (this.redshiftClients.size > 0) {
+                // Test connection to all configured Redshift clusters
+                const connectionTests = Array.from(this.redshiftClients.entries()).map(async ([ env, client ]) => {
+                    const isConnected = await client.testConnection();
 
-                if (!isConnected) {
-                    throw new Error('Redshift connection test failed');
-                }
-                logger.info('Connected to Redshift Data API successfully');
+                    if (!isConnected) {
+                        throw new Error(`Redshift (${env}) connection test failed`);
+                    }
+                    logger.info(`Connected to Redshift Data API (${env}) successfully`);
+                });
+
+                await Promise.all(connectionTests);
             }
         } catch (error) {
             logger.error('Failed to connect to data source', { error });
@@ -172,8 +220,12 @@ export class RTCStatsDataService {
     async disconnect(): Promise<void> {
         if (this.dynamoDBService) {
             await this.dynamoDBService.disconnect();
-        } else if (this.redshiftClient) {
-            await this.redshiftClient.disconnect();
+        } else if (this.redshiftClients.size > 0) {
+            const disconnectPromises = Array.from(this.redshiftClients.values()).map(client =>
+                client.disconnect()
+            );
+
+            await Promise.all(disconnectPromises);
         }
     }
 
@@ -183,18 +235,24 @@ export class RTCStatsDataService {
      *
      * @param {string} conferenceUrl - Conference URL or pattern to search
      * @param {number} maxAgeDays - Maximum age of conferences to search (default: 30)
-     * @param {string} environment - Environment (prod/pilot) - defaults to RTCSTATS_ENV config
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IConferenceMetadata[]>} Array of matching conferences
      */
     async searchConferences(
             conferenceUrl: string,
-            maxAgeDays = 30,
-            environment: 'prod' | 'pilot' = rtcstatsConfig.environment
+            maxAgeDays: number,
+            environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
         try {
             if (this.dynamoDBService) {
                 return await this.dynamoDBService.searchConferences(conferenceUrl, maxAgeDays, environment);
-            } else if (this.redshiftClient) {
+            } else {
+                const redshiftClient = this.getRedshiftClient(environment);
+
+                if (!redshiftClient) {
+                    throw new Error(`No Redshift client configured for environment: ${environment}`);
+                }
+
                 const query = `
                     SELECT DISTINCT
                         meetinguniqueid,
@@ -215,19 +273,18 @@ export class RTCStatsDataService {
                     LIMIT 100
                 `;
 
-                const result = await this.redshiftClient.executeQuery(query);
+                const result = await redshiftClient.executeQuery(query);
 
                 logger.info('Conference search completed', {
                     conferenceUrl,
-                    count: result.rows.length
+                    count: result.rows.length,
+                    environment
                 });
 
                 return result.rows.map(row => this._mapConferenceRow(row));
             }
-
-            throw new Error('No data source configured');
         } catch (error) {
-            logger.error('Conference search failed', { conferenceUrl, error });
+            logger.error('Conference search failed', { conferenceUrl, environment, error });
             const message = error instanceof Error ? error.message : String(error);
 
             throw new Error(`Failed to search conferences: ${message}`);
@@ -238,17 +295,23 @@ export class RTCStatsDataService {
      * Get conference by unique ID.
      *
      * @param {string} meetingUniqueId - Conference unique identifier
-     * @param {string} environment - Environment (prod/pilot) - defaults to RTCSTATS_ENV config
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IConferenceMetadata[]>} Conference metadata for all participants
      */
     async getConferenceById(
             meetingUniqueId: string,
-            environment: 'prod' | 'pilot' = rtcstatsConfig.environment
+            environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
         try {
             if (this.dynamoDBService) {
                 return await this.dynamoDBService.getConferenceById(meetingUniqueId, environment);
-            } else if (this.redshiftClient) {
+            } else {
+                const redshiftClient = this.getRedshiftClient(environment);
+
+                if (!redshiftClient) {
+                    throw new Error(`No Redshift client configured for environment: ${environment}`);
+                }
+
                 const query = `
                     SELECT
                         meetinguniqueid,
@@ -277,7 +340,7 @@ export class RTCStatsDataService {
                     ORDER BY sessionstarttime ASC
                 `;
 
-                const result = await this.redshiftClient.executeQuery(query);
+                const result = await redshiftClient.executeQuery(query);
 
                 logger.info('Conference details retrieved', {
                     count: result.rows.length,
@@ -300,12 +363,12 @@ export class RTCStatsDataService {
      * Get conference by session ID (for DynamoDB lookups).
      *
      * @param {string} sessionId - Session ID (UUID)
-     * @param {string} environment - Environment (prod/pilot) - defaults to RTCSTATS_ENV config
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IConferenceMetadata[]>} Session metadata
      */
     async getConferenceBySessionId(
             sessionId: string,
-            environment: 'prod' | 'pilot' = rtcstatsConfig.environment
+            environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
         try {
             if (this.dynamoDBService) {
@@ -327,12 +390,12 @@ export class RTCStatsDataService {
      * Equivalent to: rtcstats.sh list-participants <conference-id>
      *
      * @param {string} meetingUniqueId - Conference unique identifier
-     * @param {string} environment - Environment (prod/pilot) - defaults to RTCSTATS_ENV config
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IParticipantMetadata[]>} Array of participants
      */
     async listParticipants(
             meetingUniqueId: string,
-            environment: 'prod' | 'pilot' = rtcstatsConfig.environment
+            environment: RTCStatsEnvironment
     ): Promise<IParticipantMetadata[]> {
         try {
             if (this.dynamoDBService) {
@@ -344,7 +407,13 @@ export class RTCStatsDataService {
                     sessionDurationMs: p.sessionDurationMs,
                     statsSessionId: p.statsSessionId
                 }));
-            } else if (this.redshiftClient) {
+            } else {
+                const redshiftClient = this.getRedshiftClient(environment);
+
+                if (!redshiftClient) {
+                    throw new Error(`No Redshift client configured for environment: ${environment}`);
+                }
+
                 const query = `
                     SELECT
                         statssessionid,
@@ -358,10 +427,11 @@ export class RTCStatsDataService {
                     ORDER BY sessionstarttime ASC
                 `;
 
-                const result = await this.redshiftClient.executeQuery(query);
+                const result = await redshiftClient.executeQuery(query);
 
                 logger.info('Participants listed', {
                     count: result.rows.length,
+                    environment,
                     meetingUniqueId
                 });
 
@@ -372,10 +442,8 @@ export class RTCStatsDataService {
                     statsSessionId: row.statssessionid
                 }));
             }
-
-            throw new Error('No data source configured');
         } catch (error) {
-            logger.error('Failed to list participants', { error, meetingUniqueId });
+            logger.error('Failed to list participants', { environment, error, meetingUniqueId });
             const message = error instanceof Error ? error.message : String(error);
 
             throw new Error(`Failed to list participants: ${message}`);
@@ -388,10 +456,16 @@ export class RTCStatsDataService {
      * Note: Only available with Redshift
      *
      * @param {string} meetingUniqueId - Conference unique identifier
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IServerMetadata[]>} Array of server metadata
      */
-    async listServers(meetingUniqueId: string): Promise<IServerMetadata[]> {
-        if (!this.redshiftClient) {
+    async listServers(
+            meetingUniqueId: string,
+            environment: RTCStatsEnvironment
+    ): Promise<IServerMetadata[]> {
+        const redshiftClient = this.getRedshiftClient(environment);
+
+        if (!redshiftClient) {
             throw new Error('listServers is only available with Redshift data source');
         }
 
@@ -406,10 +480,11 @@ export class RTCStatsDataService {
         `;
 
         try {
-            const result = await this.redshiftClient.executeQuery(query);
+            const result = await redshiftClient.executeQuery(query);
 
             logger.info('Servers listed', {
                 count: result.rows.length,
+                environment,
                 meetingUniqueId
             });
 
@@ -423,7 +498,7 @@ export class RTCStatsDataService {
                 type: 'jvb' as const
             }));
         } catch (error) {
-            logger.error('Failed to list servers', { error, meetingUniqueId });
+            logger.error('Failed to list servers', { environment, error, meetingUniqueId });
             const message = error instanceof Error ? error.message : String(error);
 
             throw new Error(`Failed to list servers: ${message}`);
@@ -436,14 +511,18 @@ export class RTCStatsDataService {
      * Note: Only available with Redshift
      *
      * @param {string} displayName - Participant display name
-     * @param {number} maxAgeDays - Maximum age of sessions to search (default: 30)
+     * @param {number} maxAgeDays - Maximum age of sessions to search
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<IConferenceMetadata[]>} Array of conferences with this participant
      */
     async traceParticipant(
             displayName: string,
-            maxAgeDays = 30
+            maxAgeDays: number,
+            environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
-        if (!this.redshiftClient) {
+        const redshiftClient = this.getRedshiftClient(environment);
+
+        if (!redshiftClient) {
             throw new Error('traceParticipant is only available with Redshift data source');
         }
 
@@ -468,16 +547,17 @@ export class RTCStatsDataService {
         `;
 
         try {
-            const result = await this.redshiftClient.executeQuery(query);
+            const result = await redshiftClient.executeQuery(query);
 
             logger.info('Participant trace completed', {
                 count: result.rows.length,
-                displayName
+                displayName,
+                environment
             });
 
             return result.rows.map(row => this._mapConferenceRow(row));
         } catch (error) {
-            logger.error('Failed to trace participant', { displayName, error });
+            logger.error('Failed to trace participant', { displayName, environment, error });
             const message = error instanceof Error ? error.message : String(error);
 
             throw new Error(`Failed to trace participant: ${message}`);
@@ -490,23 +570,30 @@ export class RTCStatsDataService {
      * Note: Only available with Redshift
      *
      * @param {string} query - SQL query to execute
+     * @param {RTCStatsEnvironment} environment - Environment (PROD/PILOT) - required
      * @returns {Promise<any[]>} Query result rows
      */
-    async executeQuery(query: string): Promise<any[]> {
-        if (!this.redshiftClient) {
+    async executeQuery(
+            query: string,
+            environment: RTCStatsEnvironment
+    ): Promise<any[]> {
+        const redshiftClient = this.getRedshiftClient(environment);
+
+        if (!redshiftClient) {
             throw new Error('executeQuery is only available with Redshift data source');
         }
 
         try {
-            const result = await this.redshiftClient.executeQuery(query);
+            const result = await redshiftClient.executeQuery(query);
 
             logger.debug('Custom query executed', {
+                environment,
                 rowCount: result.rows.length
             });
 
             return result.rows;
         } catch (error) {
-            logger.error('Custom query failed', { error, query });
+            logger.error('Custom query failed', { environment, error, query });
             const message = error instanceof Error ? error.message : String(error);
 
             throw new Error(`Query execution failed: ${message}`);

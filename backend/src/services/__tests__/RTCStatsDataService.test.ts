@@ -3,19 +3,31 @@
  * Tests RTCStats metadata queries using Redshift Data API
  */
 
-import { RTCStatsDataService, IRTCStatsConfig, IRedshiftConfig } from '../RTCStatsDataService';
+import { RTCStatsDataService, IRTCStatsConfig, IRedshiftClustersConfig } from '../RTCStatsDataService';
 import { RedshiftDataAPIService } from '../RedshiftDataAPIService';
+import { RTCStatsEnvironment } from '../../../../shared/types/rtcstats';
 
 // Mock RedshiftDataAPIService
 jest.mock('../RedshiftDataAPIService');
 
 describe('RTCStatsDataService', () => {
     let service: RTCStatsDataService;
-    let mockRedshiftClient: jest.Mocked<RedshiftDataAPIService>;
+    let mockRedshiftClientProd: jest.Mocked<RedshiftDataAPIService>;
+    let mockRedshiftClientPilot: jest.Mocked<RedshiftDataAPIService>;
 
-    const mockRedshiftConfig: IRedshiftConfig = {
-        clusterIdentifier: 'test-cluster',
-        database: 'rtcstats',
+    const mockRedshiftConfig: IRedshiftClustersConfig = {
+        clusters: {
+            pilot: {
+                clusterIdentifier: 'test-cluster-pilot',
+                database: 'rtcstats',
+                region: 'us-east-1'
+            },
+            prod: {
+                clusterIdentifier: 'test-cluster-prod',
+                database: 'rtcstats',
+                region: 'us-east-1'
+            }
+        },
         region: 'us-east-1'
     };
 
@@ -27,35 +39,44 @@ describe('RTCStatsDataService', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         service = new RTCStatsDataService(mockConfig);
-        // Get the mocked instance
-        mockRedshiftClient = (service as any).redshiftClient;
+        // Get the mocked instances
+        const redshiftClients = (service as any).redshiftClients as Map<RTCStatsEnvironment, RedshiftDataAPIService>;
+        mockRedshiftClientProd = redshiftClients.get(RTCStatsEnvironment.PROD) as jest.Mocked<RedshiftDataAPIService>;
+        mockRedshiftClientPilot = redshiftClients.get(RTCStatsEnvironment.PILOT) as jest.Mocked<RedshiftDataAPIService>;
     });
 
     describe('constructor', () => {
         it('should initialize RedshiftDataAPIService with config', () => {
-            expect(RedshiftDataAPIService).toHaveBeenCalledWith(mockRedshiftConfig);
+            // Should be called twice - once for pilot, once for prod
+            expect(RedshiftDataAPIService).toHaveBeenCalledTimes(2);
+            expect(RedshiftDataAPIService).toHaveBeenCalledWith(mockRedshiftConfig.clusters.pilot);
+            expect(RedshiftDataAPIService).toHaveBeenCalledWith(mockRedshiftConfig.clusters.prod);
         });
     });
 
     describe('connect', () => {
         it('should successfully test connection', async () => {
-            mockRedshiftClient.testConnection.mockResolvedValue(true);
+            mockRedshiftClientPilot.testConnection.mockResolvedValue(true);
+            mockRedshiftClientProd.testConnection.mockResolvedValue(true);
 
             await expect(service.connect()).resolves.not.toThrow();
-            expect(mockRedshiftClient.testConnection).toHaveBeenCalled();
+            expect(mockRedshiftClientPilot.testConnection).toHaveBeenCalled();
+            expect(mockRedshiftClientProd.testConnection).toHaveBeenCalled();
         });
 
         it('should throw error if connection test fails', async () => {
-            mockRedshiftClient.testConnection.mockResolvedValue(false);
+            mockRedshiftClientPilot.testConnection.mockResolvedValue(false);
+            mockRedshiftClientProd.testConnection.mockResolvedValue(true);
 
             await expect(service.connect())
-                .rejects.toThrow('Connection failed: Redshift connection test failed');
+                .rejects.toThrow('Connection failed: Redshift (pilot) connection test failed');
         });
 
         it('should throw error if testConnection throws', async () => {
-            mockRedshiftClient.testConnection.mockRejectedValue(
+            mockRedshiftClientPilot.testConnection.mockRejectedValue(
                 new Error('Network timeout')
             );
+            mockRedshiftClientProd.testConnection.mockResolvedValue(true);
 
             await expect(service.connect())
                 .rejects.toThrow('Connection failed: Network timeout');
@@ -63,12 +84,14 @@ describe('RTCStatsDataService', () => {
     });
 
     describe('disconnect', () => {
-        it('should call redshiftClient.disconnect()', async () => {
-            mockRedshiftClient.disconnect.mockResolvedValue();
+        it('should call redshiftClient.disconnect() for all clients', async () => {
+            mockRedshiftClientPilot.disconnect.mockResolvedValue();
+            mockRedshiftClientProd.disconnect.mockResolvedValue();
 
             await service.disconnect();
 
-            expect(mockRedshiftClient.disconnect).toHaveBeenCalled();
+            expect(mockRedshiftClientPilot.disconnect).toHaveBeenCalled();
+            expect(mockRedshiftClientProd.disconnect).toHaveBeenCalled();
         });
     });
 
@@ -94,58 +117,58 @@ describe('RTCStatsDataService', () => {
         };
 
         it('should search conferences successfully', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue(mockResults);
+            mockRedshiftClientProd.executeQuery.mockResolvedValue(mockResults);
 
-            const results = await service.searchConferences('meet.jit.si/test', 30, 'prod');
+            const results = await service.searchConferences('meet.jit.si/test', 30, RTCStatsEnvironment.PROD);
 
             expect(results).toHaveLength(2);
             expect(results[0].meetingUniqueId).toBe('conf-123');
             expect(results[0].meetingUrl).toBe('https://meet.jit.si/test');
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('SELECT DISTINCT')
             );
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('FROM rtcstats')
             );
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('meet.jit.si/test')
             );
         });
 
         it('should use default maxAgeDays of 30', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue({ columns: [], rows: [] });
+            mockRedshiftClientProd.executeQuery.mockResolvedValue({ columns: [], rows: [] });
 
-            await service.searchConferences('test.com', 30, 'prod');
+            await service.searchConferences('test.com', 30, RTCStatsEnvironment.PROD);
 
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining("INTERVAL '30 days'")
             );
         });
 
         it('should use custom maxAgeDays', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue({ columns: [], rows: [] });
+            mockRedshiftClientProd.executeQuery.mockResolvedValue({ columns: [], rows: [] });
 
-            await service.searchConferences('test.com', 7, 'prod');
+            await service.searchConferences('test.com', 7, RTCStatsEnvironment.PROD);
 
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining("INTERVAL '7 days'")
             );
         });
 
         it('should handle empty results', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue({ columns: [], rows: [] });
+            mockRedshiftClientProd.executeQuery.mockResolvedValue({ columns: [], rows: [] });
 
-            const results = await service.searchConferences('nonexistent.com', 30, 'prod');
+            const results = await service.searchConferences('nonexistent.com', 30, RTCStatsEnvironment.PROD);
 
             expect(results).toEqual([]);
         });
 
         it('should throw error on query failure', async () => {
-            mockRedshiftClient.executeQuery.mockRejectedValue(
+            mockRedshiftClientProd.executeQuery.mockRejectedValue(
                 new Error('Query failed: permission denied')
             );
 
-            await expect(service.searchConferences('test.com', 30, 'prod'))
+            await expect(service.searchConferences('test.com', 30, RTCStatsEnvironment.PROD))
                 .rejects.toThrow('Failed to search conferences');
         });
     });
@@ -170,33 +193,33 @@ describe('RTCStatsDataService', () => {
         };
 
         it('should get conference by ID successfully', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue(mockResults);
+            mockRedshiftClientProd.executeQuery.mockResolvedValue(mockResults);
 
-            const results = await service.getConferenceById('conf-123', 'prod');
+            const results = await service.getConferenceById('conf-123', RTCStatsEnvironment.PROD);
 
             expect(results).toHaveLength(2);
             expect(results[0].meetingUniqueId).toBe('conf-123');
             expect(results[0].statsSessionId).toBe('session-1');
             expect(results[1].displayName).toBe('Bob');
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining("WHERE meetinguniqueid = 'conf-123'")
             );
         });
 
         it('should handle conference not found', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue({ columns: [], rows: [] });
+            mockRedshiftClientProd.executeQuery.mockResolvedValue({ columns: [], rows: [] });
 
-            const results = await service.getConferenceById('nonexistent', 'prod');
+            const results = await service.getConferenceById('nonexistent', RTCStatsEnvironment.PROD);
 
             expect(results).toEqual([]);
         });
 
         it('should throw error on query failure', async () => {
-            mockRedshiftClient.executeQuery.mockRejectedValue(
+            mockRedshiftClientProd.executeQuery.mockRejectedValue(
                 new Error('Query timeout')
             );
 
-            await expect(service.getConferenceById('conf-123', 'prod'))
+            await expect(service.getConferenceById('conf-123', RTCStatsEnvironment.PROD))
                 .rejects.toThrow('Failed to get conference');
         });
     });
@@ -221,33 +244,33 @@ describe('RTCStatsDataService', () => {
         };
 
         it('should list participants successfully', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue(mockResults);
+            mockRedshiftClientProd.executeQuery.mockResolvedValue(mockResults);
 
-            const results = await service.listParticipants('conf-123', 'prod');
+            const results = await service.listParticipants('conf-123', RTCStatsEnvironment.PROD);
 
             expect(results).toHaveLength(2);
             expect(results[0].statsSessionId).toBe('session-1');
             expect(results[0].displayName).toBe('Alice');
             expect(results[1].endpointId).toBe('endpoint-2');
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining("WHERE meetinguniqueid = 'conf-123'")
             );
         });
 
         it('should handle no participants', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue({ columns: [], rows: [] });
+            mockRedshiftClientProd.executeQuery.mockResolvedValue({ columns: [], rows: [] });
 
-            const results = await service.listParticipants('empty-conf', 'prod');
+            const results = await service.listParticipants('empty-conf', RTCStatsEnvironment.PROD);
 
             expect(results).toEqual([]);
         });
 
         it('should throw error on query failure', async () => {
-            mockRedshiftClient.executeQuery.mockRejectedValue(
+            mockRedshiftClientProd.executeQuery.mockRejectedValue(
                 new Error('Query failed')
             );
 
-            await expect(service.listParticipants('conf-123', 'prod'))
+            await expect(service.listParticipants('conf-123', RTCStatsEnvironment.PROD))
                 .rejects.toThrow('Failed to list participants');
         });
     });
@@ -270,9 +293,9 @@ describe('RTCStatsDataService', () => {
         };
 
         it('should list servers successfully', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue(mockResults);
+            mockRedshiftClientProd.executeQuery.mockResolvedValue(mockResults);
 
-            const results = await service.listServers('conf-123');
+            const results = await service.listServers('conf-123', RTCStatsEnvironment.PROD);
 
             expect(results).toHaveLength(2);
             expect(results[0].bridgeId).toBe('shard-1-us-east-1');
@@ -281,7 +304,7 @@ describe('RTCStatsDataService', () => {
         });
 
         it('should handle missing shard/region gracefully', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue({
+            mockRedshiftClientProd.executeQuery.mockResolvedValue({
                 columns: [ 'environment', 'region', 'shard' ],
                 rows: [
                     {
@@ -292,17 +315,17 @@ describe('RTCStatsDataService', () => {
                 ]
             });
 
-            const results = await service.listServers('conf-123');
+            const results = await service.listServers('conf-123', RTCStatsEnvironment.PROD);
 
             expect(results[0].bridgeId).toBe('unknown-unknown');
         });
 
         it('should throw error on query failure', async () => {
-            mockRedshiftClient.executeQuery.mockRejectedValue(
+            mockRedshiftClientProd.executeQuery.mockRejectedValue(
                 new Error('Query failed')
             );
 
-            await expect(service.listServers('conf-123'))
+            await expect(service.listServers('conf-123', RTCStatsEnvironment.PROD))
                 .rejects.toThrow('Failed to list servers');
         });
     });
@@ -325,43 +348,43 @@ describe('RTCStatsDataService', () => {
         };
 
         it('should trace participant successfully', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue(mockResults);
+            mockRedshiftClientProd.executeQuery.mockResolvedValue(mockResults);
 
-            const results = await service.traceParticipant('Alice Smith');
+            const results = await service.traceParticipant('Alice Smith', 30, RTCStatsEnvironment.PROD);
 
             expect(results).toHaveLength(2);
             expect(results[0].displayName).toBe('Alice Smith');
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining("WHERE displayname LIKE '%Alice Smith%'")
             );
         });
 
         it('should use default maxAgeDays of 30', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue({ columns: [], rows: [] });
+            mockRedshiftClientProd.executeQuery.mockResolvedValue({ columns: [], rows: [] });
 
-            await service.traceParticipant('John Doe');
+            await service.traceParticipant('John Doe', 30, RTCStatsEnvironment.PROD);
 
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining("INTERVAL '30 days'")
             );
         });
 
         it('should use custom maxAgeDays', async () => {
-            mockRedshiftClient.executeQuery.mockResolvedValue({ columns: [], rows: [] });
+            mockRedshiftClientProd.executeQuery.mockResolvedValue({ columns: [], rows: [] });
 
-            await service.traceParticipant('John Doe', 14);
+            await service.traceParticipant('John Doe', 14, RTCStatsEnvironment.PROD);
 
-            expect(mockRedshiftClient.executeQuery).toHaveBeenCalledWith(
+            expect(mockRedshiftClientProd.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining("INTERVAL '14 days'")
             );
         });
 
         it('should throw error on query failure', async () => {
-            mockRedshiftClient.executeQuery.mockRejectedValue(
+            mockRedshiftClientProd.executeQuery.mockRejectedValue(
                 new Error('Query failed')
             );
 
-            await expect(service.traceParticipant('Alice'))
+            await expect(service.traceParticipant('Alice', 30, RTCStatsEnvironment.PROD))
                 .rejects.toThrow('Failed to trace participant');
         });
     });
@@ -373,19 +396,19 @@ describe('RTCStatsDataService', () => {
                 rows: [ { count: 42 } ]
             };
 
-            mockRedshiftClient.executeQuery.mockResolvedValue(mockResult);
+            mockRedshiftClientProd.executeQuery.mockResolvedValue(mockResult);
 
-            const results = await service.executeQuery('SELECT COUNT(*) as count FROM rtcstats');
+            const results = await service.executeQuery('SELECT COUNT(*) as count FROM rtcstats', RTCStatsEnvironment.PROD);
 
             expect(results).toEqual([ { count: 42 } ]);
         });
 
         it('should throw error on query failure', async () => {
-            mockRedshiftClient.executeQuery.mockRejectedValue(
+            mockRedshiftClientProd.executeQuery.mockRejectedValue(
                 new Error('Invalid SQL')
             );
 
-            await expect(service.executeQuery('INVALID SQL'))
+            await expect(service.executeQuery('INVALID SQL', RTCStatsEnvironment.PROD))
                 .rejects.toThrow('Query execution failed');
         });
     });

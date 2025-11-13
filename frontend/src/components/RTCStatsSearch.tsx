@@ -51,6 +51,9 @@ import { RTCStatsEnvironment } from '../types/rtcstats';
 // Get the PUBLIC_URL for proper subpath navigation
 const PUBLIC_URL = process.env.PUBLIC_URL || '';
 
+// Check if dev mode is enabled (shows environment selector)
+const isDevMode = process.env.REACT_APP_DEV_MODE === 'true';
+
 interface IRTCStatsSearchProps {
     onConferenceReady?: (conferenceId: string, environment: RTCStatsEnvironment) => void;
 }
@@ -80,7 +83,7 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
 
     const handleSearch = async () => {
         if (!searchPattern.trim()) {
-            setError('Please enter a search pattern');
+            setError('Please enter a conference URL');
 
             return;
         }
@@ -264,7 +267,7 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                 RTCStats Conference Search
             </Typography>
             <Typography variant = 'body1' color = 'textSecondary' paragraph>
-                Search production RTCStats servers for conference data and download for analysis
+                Search RTCStats servers by conference URL and download data for analysis
             </Typography>
 
             {/* Direct Conference ID Analysis */}
@@ -273,7 +276,7 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                     Direct Conference Analysis
                 </Typography>
                 <Grid container spacing = { 2 } alignItems = 'center'>
-                    <Grid item xs = { 12 } md = { 6 }>
+                    <Grid item xs = { 12 } md = { isDevMode ? 6 : 9 }>
                         <TextField
                             fullWidth
                             label = 'Conference ID'
@@ -288,23 +291,25 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                                 }
                             } }/>
                     </Grid>
-                    <Grid item xs = { 12 } md = { 3 }>
-                        <FormControlLabel
-                            control = {
-                                <Checkbox
-                                    checked = { isPilot }
-                                    onChange = { e => setIsPilot(e.target.checked) }
-                                    disabled = { loading }/>
-                            }
-                            label = {
-                                <Box display = 'flex' alignItems = 'center' gap = { 1 }>
-                                    <ServerIcon fontSize = 'small' />
-                                    <Typography variant = 'body2'>
-                                        Pilot Environment
-                                    </Typography>
-                                </Box>
-                            }/>
-                    </Grid>
+                    {isDevMode && (
+                        <Grid item xs = { 12 } md = { 3 }>
+                            <FormControlLabel
+                                control = {
+                                    <Checkbox
+                                        checked = { isPilot }
+                                        onChange = { e => setIsPilot(e.target.checked) }
+                                        disabled = { loading }/>
+                                }
+                                label = {
+                                    <Box display = 'flex' alignItems = 'center' gap = { 1 }>
+                                        <ServerIcon fontSize = 'small' />
+                                        <Typography variant = 'body2'>
+                                            Pilot Environment
+                                        </Typography>
+                                    </Box>
+                                }/>
+                        </Grid>
+                    )}
                     <Grid item xs = { 12 } md = { 3 }>
                         <Button
                             fullWidth
@@ -340,8 +345,8 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                         <Grid item xs = { 12 } md = { 6 }>
                             <TextField
                                 fullWidth
-                                label = 'Conference Search Pattern'
-                                placeholder = 'Enter conference ID or name pattern'
+                                label = 'Conference URL'
+                                placeholder = 'Enter conference URL (e.g., meet.jit.si/myroom)'
                                 value = { searchPattern }
                                 onChange = { e => setSearchPattern(e.target.value) }
                                 disabled = { loading }
@@ -411,16 +416,18 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                         <Typography variant = 'h6'>
                             Search Results ({searchResults.count} conferences found)
                         </Typography>
-                        <Chip
-                            label = { `${searchResults.environment} environment` }
-                            color = { searchResults.environment === RTCStatsEnvironment.PILOT ? 'secondary' : 'primary' }
-                            variant = 'outlined'
-                            size = 'small'/>
+                        {isDevMode && (
+                            <Chip
+                                label = { `${searchResults.environment} environment` }
+                                color = { searchResults.environment === RTCStatsEnvironment.PILOT ? 'secondary' : 'primary' }
+                                variant = 'outlined'
+                                size = 'small'/>
+                        )}
                     </Box>
 
                     {searchResults.conferences.length === 0 ? (
                         <Typography color = 'textSecondary'>
-                            No conferences found matching "{searchResults.searchPattern}"
+                            No conferences found for URL: "{searchResults.searchPattern}"
                         </Typography>
                     ) : (
                         <List>
@@ -501,9 +508,11 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                             <Typography variant = 'body1' gutterBottom>
                                 Downloading: <strong>{selectedConference.conferenceId}</strong>
                             </Typography>
-                            <Typography variant = 'body2' color = 'textSecondary' gutterBottom>
-                                Environment: {selectedConference.environment}
-                            </Typography>
+                            {isDevMode && (
+                                <Typography variant = 'body2' color = 'textSecondary' gutterBottom>
+                                    Environment: {selectedConference.environment}
+                                </Typography>
+                            )}
 
                             {(() => {
                                 const status = downloadStatuses.get(selectedConference.conferenceId);
