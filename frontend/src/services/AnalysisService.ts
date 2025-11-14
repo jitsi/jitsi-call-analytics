@@ -3,10 +3,13 @@
  * API client for call analysis and timeline data
  */
 
+import { getLogger } from '@jitsi/logger';
 import axios from 'axios';
 
 import { API_BASE_URL } from '../config/api';
 import { ICallSession } from '../types/shared';
+
+const logger = getLogger('frontend/src/services/AnalysisService');
 
 export interface ISessionStats {
     backendComponents: {
@@ -100,7 +103,7 @@ export class AnalysisService {
                                 (progressEvent.loaded * 100) / progressEvent.total
                             );
 
-                            console.log(`Upload progress: ${percentCompleted}%`);
+                            logger.debug('Upload progress', { percentCompleted });
                         }
                     },
                 },

@@ -1602,16 +1602,16 @@ export class DumpProcessor {
                 if (componentData.componentType === 'JVB') {
                     jvbInstances.push(componentData);
                     logger.debug(
-                        `✅ Processed JVB instance: ${componentData.displayName || componentData.participantId}`
+                        `Processed JVB instance: ${componentData.displayName || componentData.participantId}`
                     );
                 } else if (componentData.componentType === 'Jicofo') {
                     jicofoInstances.push(componentData);
                     logger.debug(
-                        `✅ Processed Jicofo instance: ${componentData.displayName || componentData.participantId}`
+                        `Processed Jicofo instance: ${componentData.displayName || componentData.participantId}`
                     );
                 } else if (componentData.componentType === 'participant') {
                     rawParticipants.push(componentData);
-                    logger.debug(`✅ Processed participant endpoint: ${componentData.displayName}`);
+                    logger.debug(`Processed participant endpoint: ${componentData.displayName}`);
 
                     // Extract events from participant data only
                     const participantEvents = await this._extractEventsFromDump(file, componentData);
@@ -1959,7 +1959,7 @@ export class DumpProcessor {
             }
 
             if (participantSessions.length === 0) {
-                logger.debug(`❌ No sessions found for participant "${displayName}"`);
+                logger.debug(`No sessions found for participant "${displayName}"`);
 
                 return;
             }
@@ -1974,10 +1974,10 @@ export class DumpProcessor {
                 sessionsMap.set(session.endpointId, session.sessionId);
             }
 
-            logger.debug(`✅ Found ${participantSessions.length} sessions for participant "${displayName}":`);
+            logger.debug(`Found ${participantSessions.length} sessions for participant "${displayName}":`);
             logger.debug(`   Generated participantId: ${participantId}\n`);
 
-            logger.debug('📊 Sessions Map<endpointId, sessionId>:');
+            logger.debug('Sessions Map<endpointId, sessionId>:');
             Array.from(sessionsMap.entries()).forEach(([ endpointId, sessionId ]) => {
                 logger.debug(`   "${endpointId}" -> "${sessionId}"`);
             });

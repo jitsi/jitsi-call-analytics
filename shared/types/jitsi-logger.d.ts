@@ -15,6 +15,7 @@ declare module '@jitsi/logger' {
   }
 
   export function getLogger(id?: string): Logger;
+  export function setLogLevel(level: string | number): void;
 
   export const levels: {
     TRACE: string;

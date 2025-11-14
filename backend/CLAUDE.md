@@ -86,6 +86,33 @@ RTCSTATS_DOWNLOADS_PATH=./rtcstats-downloads
 LOG_LEVEL=info
 ```
 
+## Logging Guidelines
+
+Follow these guidelines when adding logging statements:
+
+- **Use appropriate log levels**:
+  - `logger.debug()`: Frequent operations (query results, processing steps, search completions)
+  - `logger.info()`: Important one-time events (service initialization, connection tests, significant completions)
+  - `logger.warn()`: Non-critical errors, fallback scenarios, deprecated usage
+  - `logger.error()`: Critical failures, exceptions, unrecoverable errors
+
+- **No emojis**: Never use emojis in logging messages. Use plain text only.
+- **No console.log**: Always use the logger (`getLogger()`) from `@jitsi/logger`, never `console.log/warn/error`.
+- **Structured logging**: Include relevant context objects in log statements for better debugging.
+
+**Example:**
+```typescript
+// Good
+logger.debug('Conference search completed', { conferenceUrl, count: results.length });
+logger.info('Service initialized successfully', { database, host, port });
+logger.error('Failed to connect to database', { error: err.message, host });
+
+// Bad
+logger.info('✅ Found 10 results!');  // Has emoji
+console.log('Debug info');           // Uses console.log
+logger.debug('Service started');     // Should be info for initialization
+```
+
 ## RTCStats Native Integration
 
 The backend uses **native TypeScript/Node.js integration** with AWS Redshift Data API and S3 for RTCStats data access.

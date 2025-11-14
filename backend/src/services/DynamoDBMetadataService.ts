@@ -174,7 +174,7 @@ export class DynamoDBMetadataService {
             maxAgeDays: number,
             environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
-        logger.info('Searching conferences in DynamoDB', {
+        logger.debug('Searching conferences in DynamoDB', {
             conferenceUrl,
             environment,
             maxAgeDays
@@ -206,7 +206,7 @@ export class DynamoDBMetadataService {
 
                 const result = await this.docClient.send(command);
 
-                logger.info('DynamoDB conference search completed (by URL)', {
+                logger.debug('DynamoDB conference search completed (by URL)', {
                     conferenceUrl,
                     count: result.Items?.length || 0,
                     environment
@@ -228,7 +228,7 @@ export class DynamoDBMetadataService {
 
                 const result = await this.docClient.send(command);
 
-                logger.info('DynamoDB conference search completed (by ID)', {
+                logger.debug('DynamoDB conference search completed (by ID)', {
                     conferenceUrl,
                     count: result.Items?.length || 0,
                     environment
@@ -255,7 +255,7 @@ export class DynamoDBMetadataService {
             meetingUniqueId: string,
             environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
-        logger.info('Getting conference by ID from DynamoDB', { environment, meetingUniqueId });
+        logger.debug('Getting conference by ID from DynamoDB', { environment, meetingUniqueId });
 
         try {
             // Query by conferenceId (DynamoDB field name)
@@ -270,7 +270,7 @@ export class DynamoDBMetadataService {
 
             const result = await this.docClient.send(command);
 
-            logger.info('DynamoDB conference details retrieved', {
+            logger.debug('DynamoDB conference details retrieved', {
                 count: result.Items?.length || 0,
                 environment,
                 meetingUniqueId
@@ -313,7 +313,7 @@ export class DynamoDBMetadataService {
             sessionId: string,
             environment: RTCStatsEnvironment
     ): Promise<IConferenceMetadata[]> {
-        logger.info('Getting conference by session ID from DynamoDB', { environment, sessionId });
+        logger.debug('Getting conference by session ID from DynamoDB', { environment, sessionId });
 
         try {
             // Query by sessionId using GSI
@@ -329,7 +329,7 @@ export class DynamoDBMetadataService {
 
             const result = await this.docClient.send(command);
 
-            logger.info('DynamoDB session details retrieved', {
+            logger.debug('DynamoDB session details retrieved', {
                 count: result.Items?.length || 0,
                 environment,
                 sessionId

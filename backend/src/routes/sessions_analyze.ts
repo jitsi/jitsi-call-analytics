@@ -88,7 +88,7 @@ router.get('/analyze/real', async (req: Request, res: Response) => {
                 environment as RTCStatsEnvironment
             );
 
-            logger.info(`Using RTCStats dumps path: ${actualDumpsPath}`);
+            logger.debug(`Using RTCStats dumps path: ${actualDumpsPath}`);
 
             // Get component metadata from DynamoDB
             // This provides reliable information about participants, JVBs, and Jicofo
@@ -100,7 +100,7 @@ router.get('/analyze/real', async (req: Request, res: Response) => {
                     environment as RTCStatsEnvironment
                 );
 
-                logger.info('Component metadata from DynamoDB:', {
+                logger.debug('Component metadata from DynamoDB:', {
                     participantCount: componentMetadata.participants.length,
                     jvbCount: componentMetadata.jvbs.length,
                     jicofoCount: componentMetadata.jicofo.length,
@@ -409,7 +409,7 @@ router.get('/analyze', async (req: Request, res: Response) => {
 
         // Custom dumps path: Use specified local directory
         try {
-            logger.info(`📁 Analyzing conference dumps from custom path: ${dumpsPath}`);
+            logger.debug(`Analyzing conference dumps from custom path: ${dumpsPath}`);
             const customProcessor = new DumpProcessor(dumpsPath);
             const realSession = await customProcessor.processConferenceDumps();
             const qualityMetrics = generateQualityMetricsFromRealData(realSession);
@@ -639,7 +639,7 @@ router.get('/participant/:displayName/logs', async (req: Request, res: Response)
 
         // Determine which dumps path to use
         if (rtcstats === 'true' && conferenceId && environment) {
-            logger.info(`Fetching RTCStats participant logs for ${displayName} in conference ${conferenceId}
+            logger.debug(`Fetching RTCStats participant logs for ${displayName} in conference ${conferenceId}
                 (${environment})`);
             const actualDumpsPath = rtcStatsService.getConferenceDumpsPath(
                 conferenceId as string,
@@ -835,19 +835,19 @@ router.get('/participant/:displayName/events', async (req: Request, res: Respons
         const { displayName } = req.params;
         const { rtcstats, conferenceId, environment, dumpsPath } = req.query;
 
-        logger.info(`Getting events for participant: ${displayName}`);
+        logger.debug(`Getting events for participant: ${displayName}`);
         let processor: DumpProcessor;
 
         // Determine which dumps path to use
         if (rtcstats === 'true' && conferenceId && environment) {
-            logger.info(`Fetching RTCStats participant events for ${displayName} in conference ${conferenceId}
+            logger.debug(`Fetching RTCStats participant events for ${displayName} in conference ${conferenceId}
                 (${environment})`);
             const actualDumpsPath
                 = rtcStatsService.getConferenceDumpsPath(conferenceId as string, environment as RTCStatsEnvironment);
 
             processor = new DumpProcessor(actualDumpsPath);
         } else if (dumpsPath) {
-            logger.info(`Fetching participant events for ${displayName} from dumps path: ${dumpsPath}`);
+            logger.debug(`Fetching participant events for ${displayName} from dumps path: ${dumpsPath}`);
             processor = new DumpProcessor(dumpsPath as string);
         } else {
             return res.apiError({
@@ -1079,7 +1079,7 @@ router.get('/participant/:displayName/events', async (req: Request, res: Respons
 
         const allEvents = Array.from(eventMap.values());
 
-        logger.info(`Found ${participantEvents.length} regular events and ${networkAndMediaEvents.length}
+        logger.debug(`Found ${participantEvents.length} regular events and ${networkAndMediaEvents.length}
             network/media events for participant ${displayName}`);
 
         // Calculate real performance metrics based on events

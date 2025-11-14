@@ -276,7 +276,7 @@ export class RTCStatsDataService {
 
                 const result = await redshiftClient.executeQuery(query);
 
-                logger.info('Conference search completed', {
+                logger.debug('Conference search completed', {
                     conferenceUrl,
                     count: result.rows.length,
                     environment
@@ -343,7 +343,7 @@ export class RTCStatsDataService {
 
                 const result = await redshiftClient.executeQuery(query);
 
-                logger.info('Conference details retrieved', {
+                logger.debug('Conference details retrieved', {
                     count: result.rows.length,
                     meetingUniqueId
                 });
@@ -430,7 +430,7 @@ export class RTCStatsDataService {
 
                 const result = await redshiftClient.executeQuery(query);
 
-                logger.info('Participants listed', {
+                logger.debug('Participants listed', {
                     count: result.rows.length,
                     environment,
                     meetingUniqueId
@@ -483,7 +483,7 @@ export class RTCStatsDataService {
         try {
             const result = await redshiftClient.executeQuery(query);
 
-            logger.info('Servers listed', {
+            logger.debug('Servers listed', {
                 count: result.rows.length,
                 environment,
                 meetingUniqueId
@@ -550,7 +550,7 @@ export class RTCStatsDataService {
         try {
             const result = await redshiftClient.executeQuery(query);
 
-            logger.info('Participant trace completed', {
+            logger.debug('Participant trace completed', {
                 count: result.rows.length,
                 displayName,
                 environment

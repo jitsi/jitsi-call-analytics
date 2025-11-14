@@ -3,6 +3,7 @@
  * Search interface for RTCStats production conferences with pilot environment support
  */
 
+import { getLogger } from '@jitsi/logger';
 import {
     PlayArrow as AnalyzeIcon,
     Cancel as CancelIcon,
@@ -47,6 +48,8 @@ import {
     RTCStatsService
 } from '../services/RTCStatsService';
 import { RTCStatsEnvironment } from '../types/rtcstats';
+
+const logger = getLogger('frontend/src/components/RTCStatsSearch');
 
 // Get the PUBLIC_URL for proper subpath navigation
 const PUBLIC_URL = process.env.PUBLIC_URL || '';
@@ -129,33 +132,33 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
         }
     };
     const pollDownloadStatus = async (confId: string) => {
-        console.log('[pollDownloadStatus] Starting to poll for conference:', confId);
+        logger.debug('Starting to poll for conference', { confId });
         const poll = async () => {
             try {
-                console.log('[pollDownloadStatus] Checking status for:', confId);
+                logger.debug('Checking download status', { confId });
                 const status = await RTCStatsService.getDownloadStatus(confId);
 
-                console.log('[pollDownloadStatus] Status response:', status);
+                logger.debug('Download status response', { confId, status });
 
                 if (status) {
                     setDownloadStatuses(prev => new Map(prev).set(confId, status));
 
                     if (status.status === 'completed') {
-                        console.log('[pollDownloadStatus] Download completed!');
+                        logger.info('Download completed', { confId });
                         setShowDownloadDialog(false);
                         onConferenceReady?.(confId, status.environment);
                     } else if (status.status === 'failed' || status.status === 'cancelled') {
-                        console.error('[pollDownloadStatus] Download failed or cancelled:', status.status, status.error);
+                        logger.error('Download failed or cancelled', { confId, error: status.error, status: status.status });
                         setShowDownloadDialog(false);
                         setError(`Download ${status.status}: ${status.error || 'Unknown error'}`);
                     } else if (status.status === 'downloading' || status.status === 'pending') {
-                        console.log('[pollDownloadStatus] Download in progress, will poll again in 2s...');
+                        logger.debug('Download in progress, will poll again in 2s', { confId, status: status.status });
                         // Continue polling
                         setTimeout(poll, 2000);
                     }
                 }
             } catch (err) {
-                console.error('[pollDownloadStatus] Error polling download status:', err);
+                logger.error('Error polling download status', { confId, error: err });
                 setTimeout(poll, 5000); // Retry less frequently on error
             }
         };
@@ -163,17 +166,17 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
         poll();
     };
     const handleDownload = async (conference: ConferenceSearchResult) => {
-        console.log('[handleDownload] Starting download flow for conference:', conference.conferenceId, 'environment:', conference.environment);
+        logger.debug('Starting download flow for conference', { conferenceId: conference.conferenceId, environment: conference.environment });
         setSelectedConference(conference);
 
         // Open the analysis tab immediately (before async operations) to avoid popup blocking
         const url = `${PUBLIC_URL}/?rtcstats=true&conferenceId=${encodeURIComponent(conference.conferenceId)}&environment=${encodeURIComponent(conference.environment)}`;
 
-        console.log('[handleDownload] Opening analysis tab immediately:', url);
+        logger.debug('Opening analysis tab immediately', { url });
         const newWindow = window.open(url, '_blank');
 
         if (!newWindow) {
-            console.warn('[handleDownload] Failed to open new tab - popup may be blocked');
+            logger.warn('Failed to open new tab - popup may be blocked', { url });
             setError('Failed to open new tab. Please allow popups for this site.');
 
             return;
@@ -182,24 +185,24 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
         setShowDownloadDialog(true);
 
         try {
-            console.log('[handleDownload] Calling downloadConference API...');
+            logger.debug('Calling downloadConference API', { conferenceId: conference.conferenceId, environment: conference.environment });
             const response = await RTCStatsService.downloadConference(conference.conferenceId, conference.environment);
 
-            console.log('[handleDownload] Download API response:', response);
+            logger.debug('Download API response', { conferenceId: conference.conferenceId, response });
 
             if (response.alreadyDownloaded) {
-                console.log('[handleDownload] Conference already downloaded, tab will analyze immediately');
+                logger.debug('Conference already downloaded, tab will analyze immediately', { conferenceId: conference.conferenceId });
                 setShowDownloadDialog(false);
                 // Conference already downloaded, the opened tab will handle analysis
 
                 return;
             }
 
-            console.log('[handleDownload] Download started, beginning to poll for status...');
+            logger.debug('Download started, beginning to poll for status', { conferenceId: conference.conferenceId });
             // Start polling for download status
             pollDownloadStatus(conference.conferenceId);
         } catch (err) {
-            console.error('[handleDownload] Download failed:', err);
+            logger.error('Download failed', { conferenceId: conference.conferenceId, error: err });
             setError(
                 err instanceof Error
                     ? err.message

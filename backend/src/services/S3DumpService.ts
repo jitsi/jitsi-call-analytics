@@ -116,7 +116,7 @@ export class S3DumpService {
     ): Promise<IDumpFileInfo[]> {
         const fullPrefix = `${prefix}${conferenceId}/`;
 
-        logger.info('Listing conference dumps', { conferenceId, fullPrefix });
+        logger.debug('Listing conference dumps', { conferenceId, fullPrefix });
 
         try {
             const command = new ListObjectsV2Command({
@@ -141,7 +141,7 @@ export class S3DumpService {
                     size: obj.Size
                 }));
 
-            logger.info('Conference dumps listed', {
+            logger.debug('Conference dumps listed', {
                 conferenceId,
                 count: dumps.length
             });
@@ -218,7 +218,7 @@ export class S3DumpService {
             downloadPath: string,
             onProgress?: (progress: IDownloadProgress) => void
     ): Promise<string> {
-        logger.info('Downloading conference dumps by IDs', {
+        logger.debug('Downloading conference dumps by IDs', {
             conferenceId,
             downloadPath,
             dumpCount: dumpIds.length
@@ -381,7 +381,7 @@ export class S3DumpService {
             downloadPath: string,
             prefix = ''
     ): Promise<string> {
-        logger.info('Downloading session dump', { conferenceId, sessionId });
+        logger.debug('Downloading session dump', { conferenceId, sessionId });
 
         try {
             // S3 key format: <prefix><conferenceId>/<sessionId>.ndjson

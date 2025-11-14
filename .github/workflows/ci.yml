@@ -40,12 +40,10 @@ jobs:
       - name: Lint backend
         run: npm run lint
         working-directory: ./backend
-        continue-on-error: true
 
       - name: Lint frontend
         run: npm run lint
         working-directory: ./frontend
-        continue-on-error: true
 
       - name: Build backend
         run: npm run build

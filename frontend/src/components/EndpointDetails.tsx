@@ -3,6 +3,7 @@
  * Dedicated full-page view for comprehensive endpoint debugging and analysis
  */
 
+import { getLogger } from '@jitsi/logger';
 import {
     ArrowBack as ArrowBackIcon,
     Clear as ClearIcon,
@@ -57,6 +58,8 @@ import { API_BASE_URL } from '../config/api';
 import { ICallEvent } from '../types/shared';
 
 import WebRTCStatsVisualizer from './WebRTCStatsVisualizer';
+
+const logger = getLogger('frontend/src/components/EndpointDetails');
 
 interface ITabPanelProps {
     children?: React.ReactNode;
@@ -164,7 +167,7 @@ const EndpointDetails: React.FC = () => {
                     );
                 }
             } catch (error) {
-                console.error('Failed to fetch endpoint logs:', error);
+                logger.error('Failed to fetch endpoint logs', { endpointId, error });
                 setLogsError((error as Error).message);
                 setEndpointLogs([]);
             } finally {
@@ -217,7 +220,7 @@ const EndpointDetails: React.FC = () => {
                     }));
                 }
             } catch (error) {
-                console.error('Failed to fetch session events:', error);
+                logger.error('Failed to fetch session events', { endpointId, error });
                 setSessionEvents([]);
             }
         };

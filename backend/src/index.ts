@@ -6,7 +6,7 @@
 // IMPORTANT: This must be the very first import to load environment variables
 import './env';
 
-import { getLogger } from '@jitsi/logger';
+import { getLogger, setLogLevel } from '@jitsi/logger';
 import cors from 'cors';
 import express, { Application, Request, Response } from 'express';
 import helmet from 'helmet';
@@ -23,7 +23,15 @@ import visualizationRouter from './routes/visualization';
 import { EventCorrelationEngine } from './services/EventCorrelationEngine';
 import { SessionManager } from './services/SessionManager';
 
+// Configure global log level from environment variable
+// LOG_LEVEL options: trace, debug, info, warn, error
+const logLevel = (process.env.LOG_LEVEL || 'info').toLowerCase();
+
+setLogLevel(logLevel);
+
 const logger = getLogger('backend/src/index');
+
+logger.info('Logger initialized', { logLevel });
 
 /**
  * Main application class for the Jitsi Call Analytics backend.
