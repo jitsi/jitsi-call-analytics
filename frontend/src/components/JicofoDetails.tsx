@@ -3,6 +3,7 @@
  * Shows Jicofo logs from Loki for shard instances
  */
 
+import { getLogger } from '@jitsi/logger';
 import {
     ArrowBack as ArrowBackIcon,
     Description as LogsIcon,
@@ -27,6 +28,8 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { API_BASE_URL } from '../config/api';
+
+const logger = getLogger('frontend/src/components/JicofoDetails');
 
 const JicofoDetails: React.FC = () => {
     const { shardId } = useParams<{ shardId: string; }>();
@@ -60,7 +63,7 @@ const JicofoDetails: React.FC = () => {
                     setJicofoData(result.data.shard);
                 }
             } catch (error) {
-                console.error('Failed to fetch Jicofo data:', error);
+                logger.error('Failed to fetch Jicofo data', { shardId, error });
             } finally {
                 setLoading(false);
             }

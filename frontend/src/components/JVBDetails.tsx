@@ -4,6 +4,7 @@
  * Interface matches the official jitsi/jvb-dashboard repository
  */
 
+import { getLogger } from '@jitsi/logger';
 import {
     Add as AddIcon,
     ArrowBack as ArrowBackIcon,
@@ -39,6 +40,8 @@ import Plot from 'react-plotly.js';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { API_BASE_URL } from '../config/api';
+
+const logger = getLogger('frontend/src/components/JVBDetails');
 
 interface ITabPanelProps {
     children?: React.ReactNode;
@@ -90,7 +93,7 @@ const JVBDetails: React.FC = () => {
                     setBridgeData(result.data.bridge);
                 }
             } catch (error) {
-                console.error('Failed to fetch Bridge data:', error);
+                logger.error('Failed to fetch Bridge data', { bridgeId, error });
             } finally {
                 setLoading(false);
             }
@@ -555,14 +558,14 @@ const JVBDetails: React.FC = () => {
                                 variant = 'contained'
                                 startIcon = { <AddIcon /> }
                                 size = 'small'
-                                onClick = { () => console.log('Add Graph') }>
+                                onClick = { () => logger.debug('Add Graph clicked') }>
                                 Add Graph
                             </Button>
                             <Button
                                 variant = 'contained'
                                 startIcon = { <AddIcon /> }
                                 size = 'small'
-                                onClick = { () => console.log('Add Timeline') }>
+                                onClick = { () => logger.debug('Add Timeline clicked') }>
                                 Add Timeline
                             </Button>
                         </Box>

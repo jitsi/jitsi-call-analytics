@@ -388,10 +388,65 @@ sx={{
 }}
 ```
 
+## Logging Guidelines
+
+Follow these guidelines when adding logging statements in the frontend:
+
+- **Use appropriate log levels**:
+  - `logger.debug()`: Frequent operations (data loading, state changes, API responses, detailed flow tracking)
+  - `logger.info()`: Important events (component initialization, successful operations, user actions)
+  - `logger.warn()`: Non-critical errors, fallback scenarios, deprecated usage, blocked popups
+  - `logger.error()`: Critical failures, exceptions, API errors
+
+- **Always use @jitsi/logger**: Import and use the logger from `@jitsi/logger`, never `console.log/warn/error`.
+- **No emojis**: Never use emojis in logging messages. Use plain text only.
+- **Structured logging**: Include relevant context objects for better debugging.
+
+**Setup:**
+```typescript
+import { getLogger } from '@jitsi/logger';
+
+const logger = getLogger('frontend/src/components/MyComponent');
+```
+
+**Examples:**
+```typescript
+// Good
+logger.debug('Loading conference data', { conferenceId, environment });
+logger.info('Conference analysis completed', { participantCount: result.participants.length });
+logger.error('Failed to load conference', { conferenceId, error: err.message });
+
+// Bad
+console.log('Conference loaded!');              // Uses console.log
+logger.info('✅ Success!');                      // Has emoji
+logger.debug('Component mounted');              // Should be info for initialization
+```
+
+**Common patterns:**
+```typescript
+// Loading data
+logger.debug('Fetching endpoint details', { endpointId });
+const data = await AnalysisService.getEndpointDetails(endpointId);
+logger.debug('Endpoint details loaded', { endpointId, eventCount: data.events.length });
+
+// Error handling
+try {
+    await someOperation();
+} catch (error) {
+    logger.error('Operation failed', { context: 'value', error });
+    // Show user-friendly error message
+}
+
+// User actions
+logger.debug('Opening new tab', { url });
+window.open(url, '_blank');
+```
+
 ## TypeScript Types
 
 ### Importing Shared Types
 
+Import application types from `shared/types.ts`:
 ```typescript
 import {
     CallSession,
@@ -399,6 +454,8 @@ import {
     EnhancedCallEvent
 } from '../../../shared/types';
 ```
+
+**Note**: Ambient type declarations (like `@jitsi/logger`) are automatically available from `shared/types/` via tsconfig.json includes.
 
 ### Component Props Types
 

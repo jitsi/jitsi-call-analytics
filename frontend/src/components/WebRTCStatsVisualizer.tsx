@@ -4,6 +4,7 @@
  * Displays multiple sessions per participant in separate tabs
  */
 
+import { getLogger } from '@jitsi/logger';
 import {
     BarChart as ChartIcon,
     ExpandMore as ExpandMoreIcon,
@@ -38,6 +39,8 @@ import Plot from 'react-plotly.js';
 import { useLocation } from 'react-router-dom';
 
 import { API_BASE_URL } from '../config/api';
+
+const logger = getLogger('frontend/src/components/WebRTCStatsVisualizer');
 
 interface IWebRTCStatsVisualizerProps {
     displayName?: string;
@@ -149,7 +152,7 @@ const WebRTCStatsVisualizer: React.FC<IWebRTCStatsVisualizerProps> = ({
                 setData(result);
             }
         } catch (err) {
-            console.error('Error fetching visualization data:', err);
+            logger.error('Error fetching visualization data', { participantId, displayName, conferenceId, error: err });
             setError((err as Error).message);
         } finally {
             setLoading(false);
@@ -233,7 +236,7 @@ const WebRTCStatsVisualizer: React.FC<IWebRTCStatsVisualizerProps> = ({
                     || bitRatePerSecond < 0
                     || bitRatePerSecond > 1000000000
                 ) {
-                    console.log('DEBUG BITRATE CALC:', {
+                    logger.debug('Bitrate calculation', {
                         timestamp,
                         prevTimestamp,
                         totalBytesSent,
@@ -325,7 +328,7 @@ const WebRTCStatsVisualizer: React.FC<IWebRTCStatsVisualizerProps> = ({
                                     name === 'bytesSent'
                                     || name === 'bytesReceived'
                                 ) {
-                                    console.log(
+                                    logger.debug(
                                         `DEBUG: ${reportId} ${reportData.type} ${name}:`,
                                         reportData[name],
                                         typeof reportData[name],

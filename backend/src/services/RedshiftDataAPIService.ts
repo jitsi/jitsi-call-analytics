@@ -191,7 +191,7 @@ export class RedshiftDataAPIService {
 
             const duration = Date.now() - startTime;
 
-            logger.info('Query completed', {
+            logger.debug('Query completed', {
                 duration,
                 rowCount: result.rows.length,
                 statementId: Id
