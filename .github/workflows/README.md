@@ -5,18 +5,19 @@ This directory contains CI/CD workflows for the Jitsi Call Analytics project.
 ## Workflows
 
 ### 1. CI (`ci.yml`)
-**Triggers:** Pull requests to `master`/`main` branches
+**Triggers:** Pull requests and pushes to `master`/`main` branches
 
 **What it does:**
-- Runs on Node.js 18.x and 20.x for compatibility testing
+- Runs on Node.js 20.x and 23.x for compatibility testing
 - Installs dependencies for backend, frontend, and shared modules
-- Runs linting (non-blocking)
+- **Runs linting (REQUIRED - fails CI if linting errors exist)**
 - Builds all components (shared → backend → frontend)
-- Runs unit tests for backend and frontend
+- Runs unit tests with coverage for backend and frontend
+- Uploads coverage reports to Codecov
 - Archives build artifacts for 7 days
 - Reports build status
 
-**Status:** Required check for PR merge
+**Status:** Required check for PR merge (linting enforced)
 
 ### 2. PR Checks (`pr-checks.yml`)
 **Triggers:** Pull requests opened/updated/reopened on `master`/`main` branches
@@ -88,9 +89,14 @@ Add these to your main README.md:
 - Check that all `package.json` files have `package-lock.json` committed
 - Ensure dependencies are compatible with Node.js 18.x and 20.x
 
+### Linting fails
+- Linting is now required and will fail PRs if there are any lint errors
+- Run `npm run lint:fix` locally to auto-fix most issues
+- Ensure code follows @jitsi/eslint-config rules
+
 ### Tests fail
-- Tests run with `continue-on-error: true` so they don't block PRs
-- Remove this flag to make tests required once test coverage improves
+- Tests are required and will fail PRs if they don't pass
+- Run tests locally before pushing: `npm test`
 
 ### Branch deletion fails
 - Ensure the branch is not protected
