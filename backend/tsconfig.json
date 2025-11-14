@@ -18,6 +18,6 @@
         "resolveJsonModule": true,
         "moduleResolution": "node"
     },
-    "include": ["src/**/*", "../shared/**/*", "@types/**/*"],
+    "include": ["src/**/*", "../shared/**/*"],
     "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

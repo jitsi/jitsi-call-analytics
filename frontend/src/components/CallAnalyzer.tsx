@@ -3,6 +3,7 @@
  * Input form for meeting URL and display of initial analysis
  */
 
+import { getLogger } from '@jitsi/logger';
 import {
     Schedule as DurationIcon,
     Refresh as IceRestartIcon,
@@ -37,6 +38,8 @@ import { ICallSession } from '../types/shared';
 
 import { MetricCard } from './EnhancedCard';
 import RTCStatsSearch from './RTCStatsSearch';
+
+const logger = getLogger('frontend/src/components/CallAnalyzer');
 
 // Get the PUBLIC_URL for proper subpath navigation
 const PUBLIC_URL = process.env.PUBLIC_URL || '';
@@ -93,7 +96,7 @@ const CallAnalyzer: React.FC = () => {
     // Check for analysis result from navigation state (same tab navigation)
     const getStoredAnalysisResult = (): IAnalysisResult | null => {
         if (location.state?.analysisResult) {
-            console.log('Found analysis result in location.state');
+            logger.debug('Found analysis result in location.state');
 
             return location.state.analysisResult;
         }
@@ -117,7 +120,7 @@ const CallAnalyzer: React.FC = () => {
 
         // Handle local dumps analysis (uploaded dumps)
         if (isLocalDumps && urlDumpsPath && !result) {
-            console.log('New tab detected local dumps parameters:', { urlDumpsPath, urlRoomName });
+            logger.debug('New tab detected local dumps parameters', { urlDumpsPath, urlRoomName });
 
             // Try to load from sessionStorage first
             const sessionId = urlRoomName || 'uploaded-session';
@@ -127,13 +130,13 @@ const CallAnalyzer: React.FC = () => {
                 try {
                     const parsed = JSON.parse(stored);
 
-                    console.log('Loaded analysis from sessionStorage');
+                    logger.debug('Loaded analysis from sessionStorage', { sessionId });
                     setResult(parsed.analysisResult);
                     setDownloadProgress(100);
 
                     return;
                 } catch (e) {
-                    console.warn('Failed to parse stored analysis result:', e);
+                    logger.warn('Failed to parse stored analysis result', { sessionId, error: e });
                 }
             }
 
@@ -147,12 +150,12 @@ const CallAnalyzer: React.FC = () => {
                 try {
                     const analysisResult = await AnalysisService.analyzeMeeting(urlDumpsPath);
 
-                    console.log('Local dumps analysis completed:', analysisResult);
+                    logger.info('Local dumps analysis completed', { urlDumpsPath, participantCount: analysisResult.session.participants.length });
                     setDownloadStatus('Analysis complete!');
                     setDownloadProgress(100);
                     setResult(analysisResult);
                 } catch (err) {
-                    console.error('Local dumps analysis failed:', err);
+                    logger.error('Local dumps analysis failed', { urlDumpsPath, error: err });
                     setError(err instanceof Error ? err.message : 'Local dumps analysis failed');
                     setDownloadStatus('');
                 } finally {
@@ -167,28 +170,28 @@ const CallAnalyzer: React.FC = () => {
 
         // Handle RTCStats conference analysis
         if (isRTCStats && urlConferenceId && urlEnvironment && !result) {
-            console.log('[CallAnalyzer] New tab detected RTCStats URL parameters:', { urlConferenceId, urlEnvironment });
+            logger.debug('New tab detected RTCStats URL parameters', { urlConferenceId, urlEnvironment });
 
             const waitForDownloadAndAnalyze = async () => {
-                console.log('[CallAnalyzer] Starting waitForDownloadAndAnalyze...');
+                logger.debug('Starting waitForDownloadAndAnalyze', { urlConferenceId, urlEnvironment });
                 setLoading(true);
                 setError(null);
                 setDownloadStatus('Initializing...');
                 setDownloadProgress(0);
 
                 try {
-                    console.log('[CallAnalyzer] Checking if conference is ready for analysis:', urlConferenceId);
+                    logger.debug('Checking if conference is ready for analysis', { urlConferenceId });
 
                     // First, try direct analysis in case conference is already downloaded
                     try {
-                        console.log('[CallAnalyzer] Attempting direct analysis first...');
+                        logger.debug('Attempting direct analysis first', { urlConferenceId });
                         setDownloadStatus('Checking if conference is already downloaded...');
                         const analysisResult = await AnalysisService.analyzeRTCStatsConference(
                             urlConferenceId,
                             urlEnvironment as 'prod' | 'pilot'
                         );
 
-                        console.log('[CallAnalyzer] Direct analysis succeeded - conference already downloaded!');
+                        logger.info('Direct analysis succeeded - conference already downloaded', { urlConferenceId });
                         setDownloadStatus('Analysis complete!');
                         setDownloadProgress(100);
                         setResult(analysisResult);
@@ -196,8 +199,8 @@ const CallAnalyzer: React.FC = () => {
 
                         return;
                     } catch (directAnalysisError: any) {
-                        console.log('[CallAnalyzer] Direct analysis failed:', directAnalysisError.message);
-                        console.log('[CallAnalyzer] Checking download status...');
+                        logger.debug('Direct analysis failed', { urlConferenceId, error: directAnalysisError.message });
+                        logger.debug('Checking download status', { urlConferenceId });
                         setDownloadStatus('Conference not downloaded yet, waiting for download...');
                     }
 
@@ -206,26 +209,26 @@ const CallAnalyzer: React.FC = () => {
                     let attempts = 0;
                     const maxAttempts = 60; // 2 minutes max wait (60 * 2 seconds)
 
-                    console.log('[CallAnalyzer] Starting download status polling...');
+                    logger.debug('Starting download status polling', { urlConferenceId });
 
                     while (!downloadComplete && attempts < maxAttempts) {
                         try {
-                            console.log(`[CallAnalyzer] Poll attempt ${attempts + 1}/${maxAttempts} - checking status for:`, urlConferenceId);
+                            logger.debug('Poll attempt checking status', { urlConferenceId, attempt: attempts + 1, maxAttempts });
                             const status = await RTCStatsService.getDownloadStatus(urlConferenceId);
 
-                            console.log(`[CallAnalyzer] Poll attempt ${attempts + 1} - status:`, status);
+                            logger.debug('Poll attempt status received', { urlConferenceId, attempt: attempts + 1, status: status?.status });
 
                             if (status?.status === 'completed') {
-                                console.log('[CallAnalyzer] Download completed! Proceeding with analysis');
+                                logger.info('Download completed, proceeding with analysis', { urlConferenceId });
                                 setDownloadStatus('Download complete! Starting analysis...');
                                 setDownloadProgress(100);
                                 downloadComplete = true;
                                 break;
                             } else if (status?.status === 'failed') {
-                                console.error('[CallAnalyzer] Download failed:', status.error);
+                                logger.error('Download failed', { urlConferenceId, error: status.error });
                                 throw new Error('Conference download failed: ' + (status.error || 'Unknown error'));
                             } else if (status?.status === 'cancelled') {
-                                console.error('[CallAnalyzer] Download was cancelled');
+                                logger.error('Download was cancelled', { urlConferenceId });
                                 throw new Error('Conference download was cancelled');
                             } else {
                                 // Still downloading or pending
@@ -233,19 +236,19 @@ const CallAnalyzer: React.FC = () => {
 
                                 setDownloadProgress(progress);
                                 setDownloadStatus(`Downloading conference dumps... ${progress}%`);
-                                console.log(`[CallAnalyzer] Download in progress - status: ${status?.status || 'checking'}, progress: ${progress}%`);
+                                logger.debug('Download in progress', { urlConferenceId, status: status?.status || 'checking', progress });
                             }
                         } catch (statusError: any) {
                             // If status not found (404), conference may not be downloading
-                            console.error(`[CallAnalyzer] Status check attempt ${attempts + 1} error:`, statusError.message);
+                            logger.error('Status check attempt error', { urlConferenceId, attempt: attempts + 1, error: statusError.message });
 
                             if (statusError.message.includes('404') || statusError.message.includes('not found')) {
-                                console.error('[CallAnalyzer] Download status not found - conference may not be downloading');
+                                logger.error('Download status not found - conference may not be downloading', { urlConferenceId });
                                 throw new Error('Conference not found or not being downloaded. Please search and download the conference first.');
                             }
                         }
 
-                        console.log('[CallAnalyzer] Waiting 2 seconds before next poll attempt...');
+                        logger.debug('Waiting 2 seconds before next poll attempt', { urlConferenceId, attempts });
                         await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
                         attempts++;
                     }
@@ -255,18 +258,18 @@ const CallAnalyzer: React.FC = () => {
                     }
 
                     // Download complete, now analyze
-                    console.log('Starting analysis after confirmed download completion...');
+                    logger.debug('Starting analysis after confirmed download completion', { urlConferenceId });
                     setDownloadStatus('Analyzing conference data...');
                     const analysisResult = await AnalysisService.analyzeRTCStatsConference(
                         urlConferenceId,
                         urlEnvironment as 'prod' | 'pilot'
                     );
 
-                    console.log('RTCStats analysis completed from URL:', analysisResult);
+                    logger.info('RTCStats analysis completed from URL', { urlConferenceId, participantCount: analysisResult.session.participants.length });
                     setDownloadStatus('Analysis complete!');
                     setResult(analysisResult);
                 } catch (err) {
-                    console.error('RTCStats analysis failed from URL:', err);
+                    logger.error('RTCStats analysis failed from URL', { urlConferenceId, urlEnvironment, error: err });
                     setError(err instanceof Error ? err.message : 'RTCStats analysis failed');
                     setDownloadStatus('');
                 } finally {
@@ -298,10 +301,10 @@ const CallAnalyzer: React.FC = () => {
         setError(null);
 
         try {
-            console.log(`Analyzing ${selectedFiles.length} dump files...`);
+            logger.debug('Analyzing dump files', { fileCount: selectedFiles.length });
             const analysisResult = await AnalysisService.analyzeDumpFiles(selectedFiles);
 
-            console.log('File upload analysis completed:', analysisResult);
+            logger.info('File upload analysis completed', { fileCount: selectedFiles.length, participantCount: analysisResult.session.participants.length });
 
             // Store in sessionStorage for timeline access
             const sessionId = analysisResult.session.sessionId || analysisResult.session.roomName || 'uploaded-session';
@@ -324,7 +327,7 @@ const CallAnalyzer: React.FC = () => {
 
             const url = `${PUBLIC_URL}/?localDumps=true&${params.toString()}`;
 
-            console.log('Opening analysis results in new tab:', url);
+            logger.debug('Opening analysis results in new tab', { url });
             const newWindow = window.open(url, '_blank');
 
             if (!newWindow) {
@@ -333,7 +336,7 @@ const CallAnalyzer: React.FC = () => {
                 setResult(analysisResult);
             }
         } catch (err) {
-            console.error('File upload analysis failed:', err);
+            logger.error('File upload analysis failed', { error: err });
             setError(err instanceof Error ? err.message : 'File upload analysis failed');
         } finally {
             setLoading(false);
@@ -380,7 +383,7 @@ const CallAnalyzer: React.FC = () => {
 
             const url = `${PUBLIC_URL}/call/${roomName}?${params.toString()}`;
 
-            console.log('Opening timeline with dumpsPath:', dumpsPath, 'URL:', url);
+            logger.debug('Opening timeline with dumpsPath', { dumpsPath, url });
             window.open(url, '_blank');
         }
     };
@@ -503,15 +506,15 @@ const CallAnalyzer: React.FC = () => {
                     <RTCStatsSearch
                         onConferenceReady = { async (conferenceId, environment) => {
                             // When RTCStats conference is ready, just open the new tab with parameters
-                            console.log(`RTCStats conference ready: ${conferenceId} (${environment})`);
+                            logger.debug('RTCStats conference ready', { conferenceId, environment });
 
                             // Open new tab with URL parameters that will trigger analysis in the new tab
                             const url = `${PUBLIC_URL}/?rtcstats=true&conferenceId=${encodeURIComponent(conferenceId)}&environment=${encodeURIComponent(environment)}`;
 
-                            console.log('Opening new tab with URL:', url);
+                            logger.debug('Opening new tab with URL', { url, conferenceId });
                             const newWindow = window.open(url, '_blank');
 
-                            console.log('New window opened:', !!newWindow);
+                            logger.debug('New window opened', { opened: !!newWindow, conferenceId });
                         } }/>
                 </>
             )}

@@ -23,6 +23,9 @@ RUN cd backend && npm install --omit=dev
 # Copy backend build (TypeScript compiles with rootDir=../)
 COPY backend/dist ./dist
 
+# Copy backend public files to dist
+COPY backend/public ./dist/public
+
 # Copy frontend build
 COPY frontend/build ./frontend/build
 
@@ -40,7 +43,6 @@ RUN mkdir -p /data/rtcstats-downloads/prod && \
 # Set environment variables
 ENV NODE_ENV=production \
     RTCSTATS_DOWNLOADS_PATH=/data/rtcstats-downloads \
-    FRONTEND_BUILD_PATH=/usr/src/app/frontend/build \
     PORT=5000
 
 # Expose ports

@@ -35,13 +35,13 @@ npm test -- --coverage
 Tests the low-level Redshift Data API wrapper:
 
 **Test Coverage:**
-- ✅ Query execution with polling
-- ✅ Result mapping (string, long, double, boolean, null types)
-- ✅ Error handling (failed queries, aborted queries, timeouts)
-- ✅ Connection testing
-- ✅ Empty result sets
-- ✅ Statement ID validation
-- ✅ Multi-attempt polling before query completes
+- Query execution with polling
+- Result mapping (string, long, double, boolean, null types)
+- Error handling (failed queries, aborted queries, timeouts)
+- Connection testing
+- Empty result sets
+- Statement ID validation
+- Multi-attempt polling before query completes
 
 **Key Test Scenarios:**
 1. **Successful query execution** - Mocks complete Data API flow
@@ -55,13 +55,13 @@ Tests the low-level Redshift Data API wrapper:
 Tests the high-level RTCStats metadata service:
 
 **Test Coverage:**
-- ✅ Conference search (by URL pattern)
-- ✅ Conference lookup (by ID)
-- ✅ Participant listing
-- ✅ Server listing (JVBs)
-- ✅ Participant tracing (across conferences)
-- ✅ Custom query execution
-- ✅ Connection lifecycle (connect/disconnect)
+- Conference search (by URL pattern)
+- Conference lookup (by ID)
+- Participant listing
+- Server listing (JVBs)
+- Participant tracing (across conferences)
+- Custom query execution
+- Connection lifecycle (connect/disconnect)
 
 **Key Test Scenarios:**
 1. **Search conferences** - URL pattern matching with date filters
@@ -154,11 +154,11 @@ npm install --save-dev aws-sdk-client-mock
 Target coverage: **80%+**
 
 Current coverage areas:
-- ✅ Query execution paths
-- ✅ Error handling
-- ✅ Data type conversions
-- ✅ Empty result handling
-- ✅ Timeout scenarios
+- Query execution paths
+- Error handling
+- Data type conversions
+- Empty result handling
+- Timeout scenarios
 
 ## Adding New Tests
 

@@ -367,7 +367,7 @@ export class EventCorrelationEngine extends EventEmitter {
             };
 
             this.activeSessions.set(sessionId, newSession);
-            logger.debug(`📝 Created new session: ${sessionId}`);
+            logger.debug(`Created new session: ${sessionId}`);
         }
 
         const session = this.activeSessions.get(sessionId);
@@ -520,7 +520,7 @@ export class EventCorrelationEngine extends EventEmitter {
      * @param sessionState - The session state to finalize
      */
     private _finalizeSession(sessionState: ISessionState): void {
-        logger.info(`🎯 Finalizing session: ${sessionState.sessionId}`);
+        logger.debug(`Finalizing session: ${sessionState.sessionId}`);
 
         sessionState.endTime = Date.now();
 

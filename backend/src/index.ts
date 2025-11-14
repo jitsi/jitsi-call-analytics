@@ -6,7 +6,7 @@
 // IMPORTANT: This must be the very first import to load environment variables
 import './env';
 
-import { getLogger } from '@jitsi/logger';
+import { getLogger, setLogLevel } from '@jitsi/logger';
 import cors from 'cors';
 import express, { Application, Request, Response } from 'express';
 import helmet from 'helmet';
@@ -23,7 +23,15 @@ import visualizationRouter from './routes/visualization';
 import { EventCorrelationEngine } from './services/EventCorrelationEngine';
 import { SessionManager } from './services/SessionManager';
 
+// Configure global log level from environment variable
+// LOG_LEVEL options: trace, debug, info, warn, error
+const logLevel = (process.env.LOG_LEVEL || 'info').toLowerCase();
+
+setLogLevel(logLevel);
+
 const logger = getLogger('backend/src/index');
+
+logger.info('Logger initialized', { logLevel });
 
 /**
  * Main application class for the Jitsi Call Analytics backend.
@@ -64,7 +72,7 @@ export class JitsiCallAnalytics {
         this.server = http.createServer(this.app);
         this.io = new SocketIOServer(this.server, {
             cors: {
-                origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+                origin: '*',
                 methods: [ 'GET', 'POST' ]
             }
         });
@@ -86,14 +94,14 @@ export class JitsiCallAnalytics {
      * @returns {void}
      */
     private setupMiddleware(): void {
-        // Security and basic middleware
-        this.app.use(helmet());
-        this.app.use(
-            cors({
-                origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-                credentials: true
-            })
-        );
+        // Disable Helmet CSP that was blocking scripts
+        this.app.use(helmet({
+            contentSecurityPolicy: false
+        }));
+
+        // Allow all origins for CORS (frontend served from same backend)
+        this.app.use(cors());
+
         this.app.use(express.json({ limit: '200mb' }));
         this.app.use(express.urlencoded({ extended: true, limit: '200mb' }));
 
@@ -102,7 +110,10 @@ export class JitsiCallAnalytics {
         this.app.use(requestLogger);
 
         // Serve static files from public directory
-        this.app.use('/public', express.static('src/public'));
+        // Use absolute path to handle both development and production
+        const publicPath = process.env.PUBLIC_PATH || path.join(__dirname, '../../public');
+
+        this.app.use('/public', express.static(publicPath));
     }
 
     /**
@@ -162,11 +173,6 @@ export class JitsiCallAnalytics {
             });
         });
 
-        // RTC Visualizer route
-        this.app.get('/visualizer', (req, res) => {
-            res.redirect('/public/rtc-visualizer.html');
-        });
-
         // API v1 routes
         this.app.use('/api/v1/sessions', sessionsAnalyzeRouter); // Session analysis/processing endpoints
         this.app.use('/api/v1/participants', participantsRouter); // Participant endpoints
@@ -179,12 +185,25 @@ export class JitsiCallAnalytics {
         // Serve frontend static files (in production)
         if (process.env.NODE_ENV === 'production') {
             // Allow override via env var for Docker, otherwise use relative path
-            const frontendPath = process.env.FRONTEND_BUILD_PATH || path.join(__dirname, '../../../../frontend/build');
+            const frontendPath = process.env.FRONTEND_BUILD_PATH || path.join(__dirname, '../../../frontend/build');
 
             logger.info(`Serving frontend from: ${frontendPath}`);
 
-            // Serve static files
-            this.app.use(express.static(frontendPath));
+            // Serve static files with explicit MIME types
+            this.app.use(express.static(frontendPath, {
+                setHeaders: (res, filePath) => {
+                    // Ensure correct MIME types for JavaScript files
+                    if (filePath.endsWith('.js')) {
+                        res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
+                    } else if (filePath.endsWith('.mjs')) {
+                        res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
+                    } else if (filePath.endsWith('.css')) {
+                        res.setHeader('Content-Type', 'text/css; charset=UTF-8');
+                    } else if (filePath.endsWith('.json')) {
+                        res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+                    }
+                }
+            }));
 
             // Handle SPA routing - send all non-API requests to index.html
             this.app.get('*', (_req: Request, res: Response) => {

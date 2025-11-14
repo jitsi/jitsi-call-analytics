@@ -4,6 +4,7 @@
  * Updated to remove overlapping participant details panel
  */
 
+import { getLogger } from '@jitsi/logger';
 import {
     Analytics as AnalyticsIcon,
     ArrowBack as ArrowBackIcon,
@@ -46,6 +47,8 @@ import {
 
 import TimelineVisualization from './TimelineVisualization';
 
+const logger = getLogger('frontend/src/components/CallTimeline');
+
 // Get the PUBLIC_URL for proper subpath navigation
 const PUBLIC_URL = process.env.PUBLIC_URL || '';
 
@@ -75,7 +78,7 @@ const CallTimeline: React.FC = () => {
 
                     return parsed.analysisResult;
                 } catch (e) {
-                    console.warn('Failed to parse stored analysis result:', e);
+                    logger.warn('Failed to parse stored analysis result', { error: e });
                 }
             }
         }
@@ -99,28 +102,28 @@ const CallTimeline: React.FC = () => {
 
             if (isRTCStats && conferenceId && environment) {
                 // For RTCStats conferences, use the RTCStats analysis service
-                console.log('Loading RTCStats conference data:', { conferenceId, environment });
+                logger.debug('Loading RTCStats conference data', { conferenceId, environment });
                 try {
                     const result = await AnalysisService.analyzeRTCStatsConference(conferenceId, environment);
 
-                    console.log('✅ Loaded RTCStats conference data with', result.session.events.length, 'events');
+                    logger.info('Loaded RTCStats conference data', { conferenceId, eventCount: result.session.events.length });
                     setAnalysisResult(result);
 
                     return;
                 } catch (rtcStatsError) {
-                    console.error('Failed to load RTCStats conference:', rtcStatsError);
+                    logger.error('Failed to load RTCStats conference', { conferenceId, environment, error: rtcStatsError });
                 }
             }
 
             try {
-                console.log('Attempting to load real session data...');
+                logger.debug('Attempting to load real session data', { sessionId });
                 const response = await fetch(`${API_BASE_URL}/api/v1/sessions/analyze/real`);
 
                 if (response.ok) {
                     const realData = await response.json();
 
                     if (realData.success) {
-                        console.log('✅ Loaded real session data with', realData.data.session.events.length, 'events');
+                        logger.info('Loaded real session data', { sessionId, eventCount: realData.data.session.events.length });
                         setAnalysisResult({
                             session: {
                                 ...realData.data.session,
@@ -135,7 +138,7 @@ const CallTimeline: React.FC = () => {
                     }
                 }
             } catch (realDataError) {
-                console.log('Could not load real session data:', realDataError);
+                logger.debug('Could not load real session data', { sessionId, error: realDataError });
             }
 
             // If dumpsPath is provided, use it (works for both RTCStats and uploaded dumps)
@@ -143,19 +146,19 @@ const CallTimeline: React.FC = () => {
                 try {
                     const result = await AnalysisService.analyzeMeeting(dumpsPath);
 
-                    console.log('✅ Loaded session data from dumpsPath');
+                    logger.info('Loaded session data from dumpsPath', { sessionId, dumpsPath });
                     setAnalysisResult(result);
 
                     return;
                 } catch (dumpsError) {
-                    console.log('Could not load from dumpsPath:', dumpsError);
+                    logger.debug('Could not load from dumpsPath', { sessionId, dumpsPath, error: dumpsError });
                 }
             }
 
             try {
                 const session = await AnalysisService.getSession(sessionId);
 
-                console.log('✅ Loaded session by ID:', sessionId);
+                logger.info('Loaded session by ID', { sessionId });
 
                 // Create analysis result from existing session
                 setAnalysisResult({
@@ -183,11 +186,11 @@ const CallTimeline: React.FC = () => {
 
                 return;
             } catch (sessionError) {
-                console.log('Session not found by ID, will use mock data as last resort');
+                logger.debug('Session not found by ID, will use mock data as last resort', { sessionId });
             }
 
             // LAST RESORT: Generate mock data only if no real data available
-            console.warn('⚠️  No real data available, generating mock data for:', sessionId);
+            logger.warn('No real data available, generating mock data', { sessionId });
             const mockUrl = roomName
                 ? `https://meet.jit.si/${roomName}`
                 : `mock-session-${sessionId}`;
@@ -202,7 +205,7 @@ const CallTimeline: React.FC = () => {
             setAnalysisResult(mockResult);
 
         } catch (error) {
-            console.error('Failed to load any session data:', error);
+            logger.error('Failed to load any session data', { sessionId, error });
         } finally {
             setLoading(false);
         }
@@ -292,7 +295,7 @@ const CallTimeline: React.FC = () => {
             url = `${PUBLIC_URL}/endpoint/${encodeURIComponent(participant.displayName)}?${params.toString()}`;
         }
 
-        console.log('Opening endpoint details:', url);
+        logger.debug('Opening endpoint details', { displayName: participant.displayName, url });
         window.open(url, '_blank');
     };
 

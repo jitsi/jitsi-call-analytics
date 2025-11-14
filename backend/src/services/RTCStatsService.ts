@@ -99,7 +99,7 @@ export class RTCStatsService {
                 ? rtcstatsConfig.aws.s3.buckets.prod
                 : rtcstatsConfig.aws.s3.buckets.pilot;
 
-            logger.info(`Creating S3 service for ${environment} environment`, { bucket });
+            logger.debug(`Creating S3 service for ${environment} environment`, { bucket });
 
             const s3Service = new S3DumpService({
                 accessKeyId: rtcstatsConfig.aws.accessKeyId,
@@ -158,7 +158,7 @@ export class RTCStatsService {
             // Strip https:// from the pattern
             const cleanedPattern = pattern.replace(/^https?:\/\//, '');
 
-            logger.info(`RTCStats search: pattern="${cleanedPattern}" env=${environment}`, {
+            logger.debug(`RTCStats search: pattern="${cleanedPattern}" env=${environment}`, {
                 endDate: endDate?.toISOString(),
                 startDate: startDate?.toISOString()
             });
@@ -173,7 +173,7 @@ export class RTCStatsService {
             // Pass environment to query the correct DynamoDB table
             const sessions = await this.dataService.searchConferences(cleanedPattern, maxAgeDays, environment);
 
-            logger.info(`Retrieved ${sessions.length} session records from database`);
+            logger.debug(`Retrieved ${sessions.length} session records from database`);
 
             // Group by sessionId to get unique conferences
             // sessionId is the conference UUID - multiple participants share the same sessionId
@@ -224,7 +224,7 @@ export class RTCStatsService {
                 conf.componentCount++;
             }
 
-            logger.info(`Grouped into ${conferenceMap.size} unique conferences`);
+            logger.debug(`Grouped into ${conferenceMap.size} unique conferences`);
 
             // Map to ConferenceSearchResult format
             let results: ConferenceSearchResult[] = Array.from(conferenceMap.values()).map(conf => {
@@ -254,7 +254,7 @@ export class RTCStatsService {
                     return true;
                 });
 
-                logger.info(`Date filtering: ${sessions.length} sessions -> ${results.length} unique conferences`);
+                logger.debug(`Date filtering: ${sessions.length} sessions -> ${results.length} unique conferences`);
             }
 
             // Sort by timestamp descending (newest first)
@@ -267,7 +267,7 @@ export class RTCStatsService {
 
             const searchTime = Date.now() - startTime;
 
-            logger.info(`RTCStats search completed: Found ${results.length} conferences in ${searchTime}ms`);
+            logger.debug(`RTCStats search completed: Found ${results.length} conferences in ${searchTime}ms`);
 
             return results;
 
@@ -330,7 +330,7 @@ export class RTCStatsService {
         try {
             await fs.ensureDir(downloadDir);
 
-            logger.info(`RTCStats download: conferenceId=${conferenceId} env=${environment} dir=${downloadDir}`);
+            logger.debug(`RTCStats download: conferenceId=${conferenceId} env=${environment} dir=${downloadDir}`);
 
             // Update status to downloading
             this.updateDownloadStatus(conferenceId, {
@@ -340,7 +340,7 @@ export class RTCStatsService {
 
             // Query DynamoDB to get all sessions for this conference
             // conferenceId is the sessionId (UUID) from the search results
-            logger.info('Querying DynamoDB for conference sessions', { conferenceId });
+            logger.debug('Querying DynamoDB for conference sessions', { conferenceId });
 
             let allSessions: any[] = [];
 
@@ -349,12 +349,12 @@ export class RTCStatsService {
 
             if (isUUID) {
                 // Query by sessionId to get ALL records for this specific conference session
-                logger.info('Detected UUID, querying by sessionId', { conferenceId, environment });
+                logger.debug('Detected UUID, querying by sessionId', { conferenceId, environment });
                 allSessions = await this.dataService.getConferenceBySessionId(conferenceId, environment);
-                logger.info(`Found ${allSessions.length} components for this conference session`);
+                logger.debug(`Found ${allSessions.length} components for this conference session`);
             } else {
                 // It's a conference name or URL, search directly
-                logger.info('Querying by conference name/URL', { conferenceId, environment });
+                logger.debug('Querying by conference name/URL', { conferenceId, environment });
                 allSessions = await this.dataService.searchConferences(conferenceId, 90, environment);
             }
 
@@ -364,7 +364,7 @@ export class RTCStatsService {
 
             // Extract unique dumpIds from all sessions
             // dumpId is the actual S3 filename including .gz extension
-            logger.info('Sample session data (first 3):', {
+            logger.debug('Sample session data (first 3):', {
                 samples: allSessions.slice(0, 3).map(s => ({
                     displayName: s.displayName,
                     dumpId: s.dumpId,
@@ -376,7 +376,7 @@ export class RTCStatsService {
             // Use dumpId which includes the .gz extension already
             const dumpIds = [ ...new Set(allSessions.map(s => s.dumpId).filter(Boolean)) ];
 
-            logger.info(`Found ${dumpIds.length} dump files for conference`, {
+            logger.debug(`Found ${dumpIds.length} dump files for conference`, {
                 conferenceId,
                 dumpIds: dumpIds.slice(0, 10), // Log first 10 for debugging
                 sessionCount: allSessions.length
@@ -408,7 +408,7 @@ export class RTCStatsService {
             const duration = Date.now() - startTime;
 
             // Decompress .gz files for DumpProcessor
-            logger.info('Decompressing downloaded .gz files...');
+            logger.debug('Decompressing downloaded .gz files...');
             const gzFiles = files.filter(f => f.endsWith('.gz'));
 
             for (const gzFile of gzFiles) {
@@ -431,7 +431,7 @@ export class RTCStatsService {
             const decompressedFiles = await fs.readdir(actualDownloadPath);
 
             // Extract console logs from .json files into .txt files (same as rtcstats-cli)
-            logger.info('Extracting console logs from dump files...');
+            logger.debug('Extracting console logs from dump files...');
             const jsonFiles = decompressedFiles.filter(f => f.endsWith('.json'));
 
             for (const jsonFile of jsonFiles) {
@@ -469,7 +469,7 @@ export class RTCStatsService {
                 }
             }
 
-            logger.info(`Validation: ${validFiles} valid files, ${emptyFiles.length} empty files`);
+            logger.debug(`Validation: ${validFiles} valid files, ${emptyFiles.length} empty files`);
 
             if (validFiles === 0) {
                 throw new Error('Downloaded files are empty or no valid dump files found.');
@@ -646,7 +646,7 @@ export class RTCStatsService {
 
                     if (stat.isDirectory() && stat.mtime < cutoffDate) {
                         await fs.remove(downloadPath);
-                        logger.info(`Cleaned up old download: ${conferenceId} from ${env}`);
+                        logger.debug(`Cleaned up old download: ${conferenceId} from ${env}`);
                     }
                 }
             } catch (error) {
@@ -694,7 +694,7 @@ export class RTCStatsService {
             // Query all components for this conference
             const allSessions = await this.dataService.getConferenceBySessionId(conferenceId, environment);
 
-            logger.info(`Retrieved ${allSessions.length} components for conference ${conferenceId}`);
+            logger.debug(`Retrieved ${allSessions.length} components for conference ${conferenceId}`);
 
             const participants: any[] = [];
             const jvbs: any[] = [];
@@ -737,7 +737,7 @@ export class RTCStatsService {
                 }
             }
 
-            logger.info(`Conference components: ${participants.length} participants, ${jvbs.length} JVBs, ${jicofo.length} Jicofo instances`);
+            logger.debug(`Conference components: ${participants.length} participants, ${jvbs.length} JVBs, ${jicofo.length} Jicofo instances`);
 
             return {
                 jicofo,

@@ -7,6 +7,7 @@ dist/
 *.js
 *.d.ts
 !jest.config.js
+!types/**/*.d.ts
 
 # Logs
 *.log

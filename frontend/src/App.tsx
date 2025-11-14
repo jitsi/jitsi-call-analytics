@@ -38,7 +38,7 @@ const App: React.FC = () => {
                                     color: 'text.secondary',
                                     fontSize: '0.75rem'
                                 }}>
-                                Professional Call Analytics & Performance Insights
+                                Call Analytics & Performance Insights
                             </Typography>
                         </Box>
                     </Box>

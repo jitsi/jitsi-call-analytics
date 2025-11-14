@@ -3,6 +3,7 @@
  * Search interface for RTCStats production conferences with pilot environment support
  */
 
+import { getLogger } from '@jitsi/logger';
 import {
     PlayArrow as AnalyzeIcon,
     Cancel as CancelIcon,
@@ -48,8 +49,13 @@ import {
 } from '../services/RTCStatsService';
 import { RTCStatsEnvironment } from '../types/rtcstats';
 
+const logger = getLogger('frontend/src/components/RTCStatsSearch');
+
 // Get the PUBLIC_URL for proper subpath navigation
 const PUBLIC_URL = process.env.PUBLIC_URL || '';
+
+// Check if dev mode is enabled (shows environment selector)
+const isDevMode = process.env.REACT_APP_DEV_MODE === 'true';
 
 interface IRTCStatsSearchProps {
     onConferenceReady?: (conferenceId: string, environment: RTCStatsEnvironment) => void;
@@ -80,7 +86,7 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
 
     const handleSearch = async () => {
         if (!searchPattern.trim()) {
-            setError('Please enter a search pattern');
+            setError('Please enter a conference URL');
 
             return;
         }
@@ -126,33 +132,33 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
         }
     };
     const pollDownloadStatus = async (confId: string) => {
-        console.log('[pollDownloadStatus] Starting to poll for conference:', confId);
+        logger.debug('Starting to poll for conference', { confId });
         const poll = async () => {
             try {
-                console.log('[pollDownloadStatus] Checking status for:', confId);
+                logger.debug('Checking download status', { confId });
                 const status = await RTCStatsService.getDownloadStatus(confId);
 
-                console.log('[pollDownloadStatus] Status response:', status);
+                logger.debug('Download status response', { confId, status });
 
                 if (status) {
                     setDownloadStatuses(prev => new Map(prev).set(confId, status));
 
                     if (status.status === 'completed') {
-                        console.log('[pollDownloadStatus] Download completed!');
+                        logger.info('Download completed', { confId });
                         setShowDownloadDialog(false);
                         onConferenceReady?.(confId, status.environment);
                     } else if (status.status === 'failed' || status.status === 'cancelled') {
-                        console.error('[pollDownloadStatus] Download failed or cancelled:', status.status, status.error);
+                        logger.error('Download failed or cancelled', { confId, error: status.error, status: status.status });
                         setShowDownloadDialog(false);
                         setError(`Download ${status.status}: ${status.error || 'Unknown error'}`);
                     } else if (status.status === 'downloading' || status.status === 'pending') {
-                        console.log('[pollDownloadStatus] Download in progress, will poll again in 2s...');
+                        logger.debug('Download in progress, will poll again in 2s', { confId, status: status.status });
                         // Continue polling
                         setTimeout(poll, 2000);
                     }
                 }
             } catch (err) {
-                console.error('[pollDownloadStatus] Error polling download status:', err);
+                logger.error('Error polling download status', { confId, error: err });
                 setTimeout(poll, 5000); // Retry less frequently on error
             }
         };
@@ -160,17 +166,17 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
         poll();
     };
     const handleDownload = async (conference: ConferenceSearchResult) => {
-        console.log('[handleDownload] Starting download flow for conference:', conference.conferenceId, 'environment:', conference.environment);
+        logger.debug('Starting download flow for conference', { conferenceId: conference.conferenceId, environment: conference.environment });
         setSelectedConference(conference);
 
         // Open the analysis tab immediately (before async operations) to avoid popup blocking
         const url = `${PUBLIC_URL}/?rtcstats=true&conferenceId=${encodeURIComponent(conference.conferenceId)}&environment=${encodeURIComponent(conference.environment)}`;
 
-        console.log('[handleDownload] Opening analysis tab immediately:', url);
+        logger.debug('Opening analysis tab immediately', { url });
         const newWindow = window.open(url, '_blank');
 
         if (!newWindow) {
-            console.warn('[handleDownload] Failed to open new tab - popup may be blocked');
+            logger.warn('Failed to open new tab - popup may be blocked', { url });
             setError('Failed to open new tab. Please allow popups for this site.');
 
             return;
@@ -179,24 +185,24 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
         setShowDownloadDialog(true);
 
         try {
-            console.log('[handleDownload] Calling downloadConference API...');
+            logger.debug('Calling downloadConference API', { conferenceId: conference.conferenceId, environment: conference.environment });
             const response = await RTCStatsService.downloadConference(conference.conferenceId, conference.environment);
 
-            console.log('[handleDownload] Download API response:', response);
+            logger.debug('Download API response', { conferenceId: conference.conferenceId, response });
 
             if (response.alreadyDownloaded) {
-                console.log('[handleDownload] Conference already downloaded, tab will analyze immediately');
+                logger.debug('Conference already downloaded, tab will analyze immediately', { conferenceId: conference.conferenceId });
                 setShowDownloadDialog(false);
                 // Conference already downloaded, the opened tab will handle analysis
 
                 return;
             }
 
-            console.log('[handleDownload] Download started, beginning to poll for status...');
+            logger.debug('Download started, beginning to poll for status', { conferenceId: conference.conferenceId });
             // Start polling for download status
             pollDownloadStatus(conference.conferenceId);
         } catch (err) {
-            console.error('[handleDownload] Download failed:', err);
+            logger.error('Download failed', { conferenceId: conference.conferenceId, error: err });
             setError(
                 err instanceof Error
                     ? err.message
@@ -264,7 +270,7 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                 RTCStats Conference Search
             </Typography>
             <Typography variant = 'body1' color = 'textSecondary' paragraph>
-                Search production RTCStats servers for conference data and download for analysis
+                Search RTCStats servers by conference URL and download data for analysis
             </Typography>
 
             {/* Direct Conference ID Analysis */}
@@ -273,7 +279,7 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                     Direct Conference Analysis
                 </Typography>
                 <Grid container spacing = { 2 } alignItems = 'center'>
-                    <Grid item xs = { 12 } md = { 6 }>
+                    <Grid item xs = { 12 } md = { isDevMode ? 6 : 9 }>
                         <TextField
                             fullWidth
                             label = 'Conference ID'
@@ -288,23 +294,25 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                                 }
                             } }/>
                     </Grid>
-                    <Grid item xs = { 12 } md = { 3 }>
-                        <FormControlLabel
-                            control = {
-                                <Checkbox
-                                    checked = { isPilot }
-                                    onChange = { e => setIsPilot(e.target.checked) }
-                                    disabled = { loading }/>
-                            }
-                            label = {
-                                <Box display = 'flex' alignItems = 'center' gap = { 1 }>
-                                    <ServerIcon fontSize = 'small' />
-                                    <Typography variant = 'body2'>
-                                        Pilot Environment
-                                    </Typography>
-                                </Box>
-                            }/>
-                    </Grid>
+                    {isDevMode && (
+                        <Grid item xs = { 12 } md = { 3 }>
+                            <FormControlLabel
+                                control = {
+                                    <Checkbox
+                                        checked = { isPilot }
+                                        onChange = { e => setIsPilot(e.target.checked) }
+                                        disabled = { loading }/>
+                                }
+                                label = {
+                                    <Box display = 'flex' alignItems = 'center' gap = { 1 }>
+                                        <ServerIcon fontSize = 'small' />
+                                        <Typography variant = 'body2'>
+                                            Pilot Environment
+                                        </Typography>
+                                    </Box>
+                                }/>
+                        </Grid>
+                    )}
                     <Grid item xs = { 12 } md = { 3 }>
                         <Button
                             fullWidth
@@ -340,8 +348,8 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                         <Grid item xs = { 12 } md = { 6 }>
                             <TextField
                                 fullWidth
-                                label = 'Conference Search Pattern'
-                                placeholder = 'Enter conference ID or name pattern'
+                                label = 'Conference URL'
+                                placeholder = 'Enter conference URL (e.g., meet.jit.si/myroom)'
                                 value = { searchPattern }
                                 onChange = { e => setSearchPattern(e.target.value) }
                                 disabled = { loading }
@@ -411,16 +419,18 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                         <Typography variant = 'h6'>
                             Search Results ({searchResults.count} conferences found)
                         </Typography>
-                        <Chip
-                            label = { `${searchResults.environment} environment` }
-                            color = { searchResults.environment === RTCStatsEnvironment.PILOT ? 'secondary' : 'primary' }
-                            variant = 'outlined'
-                            size = 'small'/>
+                        {isDevMode && (
+                            <Chip
+                                label = { `${searchResults.environment} environment` }
+                                color = { searchResults.environment === RTCStatsEnvironment.PILOT ? 'secondary' : 'primary' }
+                                variant = 'outlined'
+                                size = 'small'/>
+                        )}
                     </Box>
 
                     {searchResults.conferences.length === 0 ? (
                         <Typography color = 'textSecondary'>
-                            No conferences found matching "{searchResults.searchPattern}"
+                            No conferences found for URL: "{searchResults.searchPattern}"
                         </Typography>
                     ) : (
                         <List>
@@ -501,9 +511,11 @@ const RTCStatsSearch: React.FC<IRTCStatsSearchProps> = ({ onConferenceReady }) =
                             <Typography variant = 'body1' gutterBottom>
                                 Downloading: <strong>{selectedConference.conferenceId}</strong>
                             </Typography>
-                            <Typography variant = 'body2' color = 'textSecondary' gutterBottom>
-                                Environment: {selectedConference.environment}
-                            </Typography>
+                            {isDevMode && (
+                                <Typography variant = 'body2' color = 'textSecondary' gutterBottom>
+                                    Environment: {selectedConference.environment}
+                                </Typography>
+                            )}
 
                             {(() => {
                                 const status = downloadStatuses.get(selectedConference.conferenceId);

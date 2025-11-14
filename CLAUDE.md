@@ -11,6 +11,8 @@ Jitsi Call Analytics is a next-generation analytics platform for Jitsi Meet that
 - **backend/**: Node.js/Express API server with native AWS Redshift/S3 integration (see `backend/CLAUDE.md`)
 - **frontend/**: React/Material-UI dashboard application (see `frontend/CLAUDE.md`)
 - **shared/**: TypeScript types and interfaces used across backend/frontend
+  - `types.ts`: Shared type definitions and interfaces
+  - `types/`: Ambient type declarations (e.g., jitsi-logger.d.ts for third-party packages)
 
 ## Architecture Overview
 
@@ -56,6 +58,7 @@ All code must adhere to the following style guidelines:
 - **Object Key Sorting**: Sort object keys in ascending order where applicable
 - **Indentation**: Use 4-space indentation consistently across all files
 - **JSDoc Comments**: Required for all public functions, classes, and interfaces
+- **No Emojis**: Do not use emojis in any code, comments, logging messages, or documentation. Use plain text only.
 
 **Example:**
 ```typescript
@@ -131,18 +134,22 @@ npm run lint:backend
 npm run lint:frontend
 ```
 
-## Shared Types (shared/types.ts)
+## Shared Types
 
-### Core Types
+### shared/types.ts - Application Types
+Core TypeScript types and interfaces exported for use across backend/frontend:
 - **CallSession**: Complete session with participants, events, metrics
 - **ParticipantDetails**: Full participant info including clientInfo, jitsiClient, connection, qualityMetrics
 - **EnhancedCallEvent**: Timeline event with participant context
 - **DumpEventType**: Enum of all dump file event types (identity, connectionInfo, stats, logs, etc.)
-
-### Key Interfaces
 - **IRTCStatsEntry**: Raw dump file entry format (5-element array)
 - **IConnectionInfo**: User agent and session metadata
 - **IIdentityInfo**: Participant/component identification
+
+### shared/types/ - Ambient Type Declarations
+TypeScript declaration files for third-party packages without official type definitions:
+- **jitsi-logger.d.ts**: Type declarations for @jitsi/logger package
+- **rtcstats.ts**: RTCStats-specific type definitions (enums, interfaces)
 
 ## Docker Deployment
 
